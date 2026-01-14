@@ -13,8 +13,10 @@ NotifyGen automatically generates property implementations with change notificat
 - **Zero boilerplate** - Just add `[Notify]` to your class
 - **Compile-time generation** - No runtime overhead
 - **Equality guards** - Only raises `PropertyChanged` when values actually change
-- **Partial hooks** - `OnXxxChanged()` methods for custom logic
+- **Partial hooks** - `OnXxxChanging()` and `OnXxxChanged()` methods for custom logic
 - **Dependent properties** - `[NotifyAlso]` for computed properties
+- **Custom property names** - `[NotifyName]` to override generated names
+- **Setter access control** - `[NotifySetter]` to restrict setter visibility
 - **IDE support** - Full IntelliSense for generated properties
 - **Nullable aware** - Handles nullable reference types correctly
 
@@ -56,6 +58,7 @@ public partial class Person : INotifyPropertyChanged
         set
         {
             if (EqualityComparer<string>.Default.Equals(_name, value)) return;
+            OnNameChanging(_name, value);
             _name = value;
             OnPropertyChanged();
             OnNameChanged();
@@ -68,6 +71,7 @@ public partial class Person : INotifyPropertyChanged
         set
         {
             if (EqualityComparer<int>.Default.Equals(_age, value)) return;
+            OnAgeChanging(_age, value);
             _age = value;
             OnPropertyChanged();
             OnAgeChanged();
@@ -80,6 +84,7 @@ public partial class Person : INotifyPropertyChanged
         set
         {
             if (EqualityComparer<string?>.Default.Equals(_email, value)) return;
+            OnEmailChanging(_email, value);
             _email = value;
             OnPropertyChanged();
             OnEmailChanged();
@@ -91,8 +96,11 @@ public partial class Person : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
+    partial void OnNameChanging(string oldValue, string newValue);
     partial void OnNameChanged();
+    partial void OnAgeChanging(int oldValue, int newValue);
     partial void OnAgeChanged();
+    partial void OnEmailChanging(string? oldValue, string? newValue);
     partial void OnEmailChanged();
 }
 ```
@@ -160,9 +168,65 @@ You can notify multiple properties:
 private string _firstName;
 ```
 
+### `[NotifyName]`
+
+Override the default property name derived from the field name.
+
+```csharp
+[Notify]
+public partial class Settings
+{
+    [NotifyName("IsVisible")]
+    private bool _visibleState;  // Generates IsVisible property instead of VisibleState
+}
+```
+
+### `[NotifySetter]`
+
+Control the access level of the generated setter.
+
+```csharp
+[Notify]
+public partial class Entity
+{
+    [NotifySetter(AccessLevel.Private)]
+    private int _id;  // Generates: public int Id { get; private set; }
+
+    [NotifySetter(AccessLevel.Protected)]
+    private string _internalState;  // Generates: public string InternalState { get; protected set; }
+}
+```
+
+Available access levels:
+- `AccessLevel.Public` (default)
+- `AccessLevel.Protected`
+- `AccessLevel.Internal`
+- `AccessLevel.Private`
+- `AccessLevel.ProtectedInternal`
+- `AccessLevel.PrivateProtected`
+
 ## Partial Hooks
 
-Every generated property includes a partial method hook that's called after the value changes:
+Every generated property includes two partial method hooks:
+
+### `On{Property}Changing` - Called Before Assignment
+
+```csharp
+[Notify]
+public partial class Order
+{
+    private decimal _total;
+
+    partial void OnTotalChanging(decimal oldValue, decimal newValue)
+    {
+        // Called before the value changes
+        // Useful for validation or logging
+        Console.WriteLine($"Total changing from {oldValue} to {newValue}");
+    }
+}
+```
+
+### `On{Property}Changed` - Called After Assignment
 
 ```csharp
 [Notify]
@@ -172,7 +236,7 @@ public partial class Settings
 
     partial void OnDarkModeChanged()
     {
-        // Called whenever DarkMode changes
+        // Called after the value changes
         ApplyTheme(DarkMode ? Theme.Dark : Theme.Light);
     }
 }
@@ -186,6 +250,7 @@ NotifyGen includes analyzers to catch common mistakes:
 |------|----------|-------------|
 | NOTIFY001 | Error | Class marked with `[Notify]` must be `partial` |
 | NOTIFY002 | Warning | No eligible fields found (no underscore-prefixed private fields) |
+| NOTIFY003 | Warning | `[NotifyAlso]` references a property that doesn't exist |
 
 ## Requirements
 

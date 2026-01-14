@@ -32,17 +32,25 @@ internal readonly struct FieldInfo
     /// </summary>
     public ImmutableArray<string> AlsoNotify { get; }
 
+    /// <summary>
+    /// The access modifier for the setter (e.g., "private", "protected").
+    /// Null means use the same access as the property (public).
+    /// </summary>
+    public string? SetterAccess { get; }
+
     public FieldInfo(
         string fieldName,
         string propertyName,
         string typeName,
         bool isNullable,
-        ImmutableArray<string> alsoNotify)
+        ImmutableArray<string> alsoNotify,
+        string? setterAccess = null)
     {
         FieldName = fieldName;
         PropertyName = propertyName;
         TypeName = typeName;
         IsNullable = isNullable;
         AlsoNotify = alsoNotify;
+        SetterAccess = setterAccess;
     }
 }
