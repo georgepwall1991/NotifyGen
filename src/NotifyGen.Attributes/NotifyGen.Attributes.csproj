@@ -18,6 +18,8 @@
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <Copyright>Copyright (c) 2025 George Wall</Copyright>
+    <!-- Don't publish separately - bundled in NotifyGen package -->
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
