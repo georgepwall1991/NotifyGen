@@ -83,6 +83,120 @@ public class AnalyzerTests
         diagnostics.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Analyzer_NotifyAlsoWithUnknownProperty_ReportsWarning()
+    {
+        // Arrange
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class Person
+                {
+                    [NotifyAlso("NonExistentProperty")]
+                    private string _name;
+                }
+            }
+            """;
+
+        // Act
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        // Assert
+        diagnostics.Should().ContainSingle(d => d.Id == "NOTIFY003");
+        var diagnostic = diagnostics.First(d => d.Id == "NOTIFY003");
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Warning);
+        diagnostic.GetMessage().Should().Contain("_name");
+        diagnostic.GetMessage().Should().Contain("NonExistentProperty");
+    }
+
+    [Fact]
+    public async Task Analyzer_NotifyAlsoWithExistingProperty_ReportsNoDiagnostics()
+    {
+        // Arrange
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class Person
+                {
+                    [NotifyAlso("FullName")]
+                    private string _firstName;
+
+                    public string FullName => _firstName;
+                }
+            }
+            """;
+
+        // Act
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        // Assert
+        diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Analyzer_NotifyAlsoWithGeneratedProperty_ReportsNoDiagnostics()
+    {
+        // Arrange
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class Person
+                {
+                    [NotifyAlso("LastName")]
+                    private string _firstName;
+
+                    private string _lastName;
+                }
+            }
+            """;
+
+        // Act
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        // Assert
+        diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Analyzer_MultipleNotifyAlso_OnlyReportsUnknown()
+    {
+        // Arrange
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class Person
+                {
+                    [NotifyAlso("FullName")]
+                    [NotifyAlso("UnknownProp")]
+                    [NotifyAlso("LastName")]
+                    private string _firstName;
+
+                    private string _lastName;
+                    public string FullName => _firstName;
+                }
+            }
+            """;
+
+        // Act
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        // Assert
+        diagnostics.Should().ContainSingle(d => d.Id == "NOTIFY003");
+        diagnostics.First(d => d.Id == "NOTIFY003").GetMessage().Should().Contain("UnknownProp");
+    }
+
     private static async Task<IReadOnlyList<Diagnostic>> GetDiagnosticsAsync(string source)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(source);

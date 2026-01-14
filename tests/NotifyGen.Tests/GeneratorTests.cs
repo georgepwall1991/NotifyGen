@@ -35,8 +35,50 @@ public class GeneratorTests
         generatedSource.Should().Contain("public string Name");
         generatedSource.Should().Contain("public int Age");
         generatedSource.Should().Contain("public event PropertyChangedEventHandler? PropertyChanged");
+        generatedSource.Should().Contain("partial void OnNameChanging(string oldValue, string newValue)");
         generatedSource.Should().Contain("partial void OnNameChanged()");
+        generatedSource.Should().Contain("partial void OnAgeChanging(int oldValue, int newValue)");
         generatedSource.Should().Contain("partial void OnAgeChanged()");
+    }
+
+    [Fact]
+    public void Generator_OnChangingHook_CalledBeforeAssignment()
+    {
+        // Arrange
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class Person
+                {
+                    private string _name;
+                }
+            }
+            """;
+
+        // Act
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+
+        // Assert
+        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
+
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "Person.g.cs");
+        generatedSource.Should().NotBeNull();
+
+        // OnChanging should be called with old and new values
+        generatedSource.Should().Contain("OnNameChanging(_name, value)");
+
+        // Verify the order: OnChanging -> assignment -> OnPropertyChanged -> OnChanged
+        var changingIndex = generatedSource!.IndexOf("OnNameChanging(_name, value)");
+        var assignmentIndex = generatedSource.IndexOf("_name = value");
+        var propertyChangedIndex = generatedSource.IndexOf("OnPropertyChanged()");
+        var changedIndex = generatedSource.IndexOf("OnNameChanged()");
+
+        changingIndex.Should().BeLessThan(assignmentIndex, "OnChanging should be called before assignment");
+        assignmentIndex.Should().BeLessThan(propertyChangedIndex, "assignment should happen before OnPropertyChanged");
+        propertyChangedIndex.Should().BeLessThan(changedIndex, "OnPropertyChanged should be called before OnChanged");
     }
 
     [Fact]
@@ -211,6 +253,98 @@ public class GeneratorTests
         generatedSource.Should().NotBeNull();
         generatedSource.Should().Contain("public partial class GlobalPerson : INotifyPropertyChanged");
         generatedSource.Should().NotContain("namespace");
+    }
+
+    [Fact]
+    public void Generator_WithNotifyName_UsesCustomPropertyName()
+    {
+        // Arrange
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class Settings
+                {
+                    [NotifyName("IsVisible")]
+                    private bool _visibleState;
+                }
+            }
+            """;
+
+        // Act
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+
+        // Assert
+        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
+
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "Settings.g.cs");
+        generatedSource.Should().NotBeNull();
+        generatedSource.Should().Contain("public bool IsVisible");
+        generatedSource.Should().NotContain("VisibleState");
+        generatedSource.Should().Contain("OnIsVisibleChanging");
+        generatedSource.Should().Contain("OnIsVisibleChanged");
+    }
+
+    [Fact]
+    public void Generator_WithNotifySetter_GeneratesPrivateSetter()
+    {
+        // Arrange
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class Entity
+                {
+                    [NotifySetter(AccessLevel.Private)]
+                    private int _id;
+                }
+            }
+            """;
+
+        // Act
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+
+        // Assert
+        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
+
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "Entity.g.cs");
+        generatedSource.Should().NotBeNull();
+        generatedSource.Should().Contain("public int Id");
+        generatedSource.Should().Contain("private set");
+    }
+
+    [Fact]
+    public void Generator_WithNotifySetter_GeneratesProtectedSetter()
+    {
+        // Arrange
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class BaseEntity
+                {
+                    [NotifySetter(AccessLevel.Protected)]
+                    private string _name;
+                }
+            }
+            """;
+
+        // Act
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+
+        // Assert
+        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
+
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "BaseEntity.g.cs");
+        generatedSource.Should().NotBeNull();
+        generatedSource.Should().Contain("public string Name");
+        generatedSource.Should().Contain("protected set");
     }
 
     [Fact]

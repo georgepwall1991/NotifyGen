@@ -21,6 +21,8 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     private const string NotifyAttributeName = "NotifyGen.NotifyAttribute";
     private const string NotifyIgnoreAttributeName = "NotifyGen.NotifyIgnoreAttribute";
     private const string NotifyAlsoAttributeName = "NotifyGen.NotifyAlsoAttribute";
+    private const string NotifyNameAttributeName = "NotifyGen.NotifyNameAttribute";
+    private const string NotifySetterAttributeName = "NotifyGen.NotifySetterAttribute";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -133,8 +135,11 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 a.AttributeClass?.ToDisplayString() == NotifyIgnoreAttributeName))
                 continue;
 
-            // Get property name from field name (_name -> Name)
-            var propertyName = char.ToUpperInvariant(fieldSymbol.Name[1]) + fieldSymbol.Name.Substring(2);
+            // Get property name - either from [NotifyName] or derived from field name (_name -> Name)
+            var notifyNameAttr = fieldSymbol.GetAttributes()
+                .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifyNameAttributeName);
+            var propertyName = notifyNameAttr?.ConstructorArguments.FirstOrDefault().Value as string
+                ?? char.ToUpperInvariant(fieldSymbol.Name[1]) + fieldSymbol.Name.Substring(2);
 
             // Get type name with nullability (use keyword format: string instead of System.String)
             var typeFormat = new SymbolDisplayFormat(
@@ -158,7 +163,26 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 .Cast<string>()
                 .ToImmutableArray();
 
-            fields.Add(new FieldInfo(fieldSymbol.Name, propertyName, typeName, isNullable, alsoNotify));
+            // Get [NotifySetter] attribute for setter access level
+            var setterAttr = fieldSymbol.GetAttributes()
+                .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifySetterAttributeName);
+            string? setterAccess = null;
+            if (setterAttr != null && setterAttr.ConstructorArguments.Length > 0)
+            {
+                var accessLevel = (int)setterAttr.ConstructorArguments[0].Value!;
+                setterAccess = accessLevel switch
+                {
+                    0 => null, // Public - same as property, no modifier needed
+                    1 => "protected",
+                    2 => "internal",
+                    3 => "private",
+                    4 => "protected internal",
+                    5 => "private protected",
+                    _ => null
+                };
+            }
+
+            fields.Add(new FieldInfo(fieldSymbol.Name, propertyName, typeName, isNullable, alsoNotify, setterAccess));
         }
 
         return fields.ToImmutableArray();
@@ -222,6 +246,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         // Generate partial hooks
         foreach (var field in classInfo.Fields)
         {
+            sb.AppendLine($"{indent}    partial void On{field.PropertyName}Changing({field.TypeName} oldValue, {field.TypeName} newValue);");
             sb.AppendLine($"{indent}    partial void On{field.PropertyName}Changed();");
         }
 
@@ -244,9 +269,11 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         sb.AppendLine($"{indent}    public {field.TypeName} {field.PropertyName}");
         sb.AppendLine($"{indent}    {{");
         sb.AppendLine($"{indent}        get => {field.FieldName};");
-        sb.AppendLine($"{indent}        set");
+        var setterModifier = field.SetterAccess != null ? $"{field.SetterAccess} " : "";
+        sb.AppendLine($"{indent}        {setterModifier}set");
         sb.AppendLine($"{indent}        {{");
         sb.AppendLine($"{indent}            if (EqualityComparer<{field.TypeName}>.Default.Equals({field.FieldName}, value)) return;");
+        sb.AppendLine($"{indent}            On{field.PropertyName}Changing({field.FieldName}, value);");
         sb.AppendLine($"{indent}            {field.FieldName} = value;");
         sb.AppendLine($"{indent}            OnPropertyChanged();");
 

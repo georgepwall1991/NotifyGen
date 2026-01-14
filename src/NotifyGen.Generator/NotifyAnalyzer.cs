@@ -14,11 +14,15 @@ namespace NotifyGen.Generator;
 public sealed class NotifyAnalyzer : DiagnosticAnalyzer
 {
     private const string NotifyAttributeName = "NotifyGen.NotifyAttribute";
+    private const string NotifyAlsoAttributeName = "NotifyGen.NotifyAlsoAttribute";
+    private const string NotifyIgnoreAttributeName = "NotifyGen.NotifyIgnoreAttribute";
+    private const string NotifyNameAttributeName = "NotifyGen.NotifyNameAttribute";
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         ImmutableArray.Create(
             DiagnosticDescriptors.ClassMustBePartial,
-            DiagnosticDescriptors.NoEligibleFields);
+            DiagnosticDescriptors.NoEligibleFields,
+            DiagnosticDescriptors.UnknownNotifyAlsoProperty);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -74,5 +78,80 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                 classSymbol.Name);
             context.ReportDiagnostic(diagnostic);
         }
+
+        // Check NotifyAlso references (NOTIFY003)
+        AnalyzeNotifyAlsoReferences(context, classSymbol);
+    }
+
+    private static void AnalyzeNotifyAlsoReferences(SyntaxNodeAnalysisContext context, INamedTypeSymbol classSymbol)
+    {
+        // Collect all property names that exist or will be generated
+        var existingProperties = classSymbol.GetMembers()
+            .OfType<IPropertySymbol>()
+            .Select(p => p.Name)
+            .ToImmutableHashSet();
+
+        // Collect property names that will be generated from fields (respecting [NotifyName])
+        var generatedProperties = classSymbol.GetMembers()
+            .OfType<IFieldSymbol>()
+            .Where(f => f.DeclaredAccessibility == Accessibility.Private
+                && f.Name.StartsWith("_")
+                && f.Name.Length >= 2
+                && !f.GetAttributes().Any(a =>
+                    a.AttributeClass?.ToDisplayString() == NotifyIgnoreAttributeName))
+            .Select(f =>
+            {
+                var notifyNameAttr = f.GetAttributes()
+                    .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifyNameAttributeName);
+                return notifyNameAttr?.ConstructorArguments.FirstOrDefault().Value as string
+                    ?? char.ToUpperInvariant(f.Name[1]) + f.Name.Substring(2);
+            })
+            .ToImmutableHashSet();
+
+        var allKnownProperties = existingProperties.Union(generatedProperties);
+
+        // Check each field with [NotifyAlso]
+        foreach (var field in classSymbol.GetMembers().OfType<IFieldSymbol>())
+        {
+            var notifyAlsoAttributes = field.GetAttributes()
+                .Where(a => a.AttributeClass?.ToDisplayString() == NotifyAlsoAttributeName);
+
+            foreach (var attr in notifyAlsoAttributes)
+            {
+                var propertyName = attr.ConstructorArguments.FirstOrDefault().Value as string;
+                if (string.IsNullOrEmpty(propertyName))
+                    continue;
+
+                if (!allKnownProperties.Contains(propertyName!))
+                {
+                    // Find the attribute syntax location for better error placement
+                    var location = GetAttributeLocation(field, attr, context.CancellationToken);
+
+                    var diagnostic = Diagnostic.Create(
+                        DiagnosticDescriptors.UnknownNotifyAlsoProperty,
+                        location,
+                        field.Name,
+                        propertyName);
+                    context.ReportDiagnostic(diagnostic);
+                }
+            }
+        }
+    }
+
+    private static Location GetAttributeLocation(IFieldSymbol field, AttributeData attribute, System.Threading.CancellationToken ct)
+    {
+        // Try to get the syntax location of the attribute
+        if (attribute.ApplicationSyntaxReference?.GetSyntax(ct) is { } syntax)
+        {
+            return syntax.GetLocation();
+        }
+
+        // Fall back to the field's location
+        if (field.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(ct) is { } fieldSyntax)
+        {
+            return fieldSyntax.GetLocation();
+        }
+
+        return Location.None;
     }
 }

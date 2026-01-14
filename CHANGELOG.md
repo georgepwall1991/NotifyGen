@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-01-14
+
+### Added
+
+- **OnChanging Hook**: New `On{Property}Changing(T oldValue, T newValue)` partial method called *before* the property value is assigned, enabling validation and cancellation scenarios
+- **Custom Property Names**: New `[NotifyName("CustomName")]` attribute to override the default property name derived from field name
+- **Setter Access Modifiers**: New `[NotifySetter(AccessLevel)]` attribute to control setter visibility (Private, Protected, Internal, etc.)
+- **NOTIFY003 Diagnostic**: New analyzer warning when `[NotifyAlso]` references a non-existent property
+
+### Changed
+
+- Generated setter now calls `OnChanging` before assignment, then `OnPropertyChanged`, then `OnChanged`
+
 ## [1.0.0] - 2025-01-14
 
 ### Added
