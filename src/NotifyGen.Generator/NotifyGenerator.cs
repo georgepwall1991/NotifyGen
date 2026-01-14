@@ -92,9 +92,15 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             ? ns.ToDisplayString()
             : string.Empty;
 
+        // Get type parameters for generic classes
+        var typeParameters = classSymbol.TypeParameters.Length > 0
+            ? "<" + string.Join(", ", classSymbol.TypeParameters.Select(tp => tp.Name)) + ">"
+            : string.Empty;
+
         return new ClassInfo(
             namespaceName,
             classSymbol.Name,
+            typeParameters,
             accessibility,
             alreadyImplementsInpc,
             fields);
@@ -186,7 +192,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
 
         // Class declaration with interface
         var interfaces = classInfo.AlreadyImplementsInpc ? "" : " : INotifyPropertyChanged";
-        sb.AppendLine($"{indent}{classInfo.Accessibility} partial class {classInfo.ClassName}{interfaces}");
+        sb.AppendLine($"{indent}{classInfo.Accessibility} partial class {classInfo.ClassName}{classInfo.TypeParameters}{interfaces}");
         sb.AppendLine($"{indent}{{");
 
         // PropertyChanged event (only if not already implemented)
