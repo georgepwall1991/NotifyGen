@@ -13,9 +13,14 @@ internal readonly struct ClassInfo
     public string Namespace { get; }
 
     /// <summary>
-    /// The class name.
+    /// The class name (without type parameters).
     /// </summary>
     public string ClassName { get; }
+
+    /// <summary>
+    /// The type parameters (e.g., "&lt;T&gt;" or "&lt;TKey, TValue&gt;"), empty if not generic.
+    /// </summary>
+    public string TypeParameters { get; }
 
     /// <summary>
     /// The accessibility modifier (public, internal, etc.).
@@ -35,12 +40,14 @@ internal readonly struct ClassInfo
     public ClassInfo(
         string @namespace,
         string className,
+        string typeParameters,
         string accessibility,
         bool alreadyImplementsInpc,
         ImmutableArray<FieldInfo> fields)
     {
         Namespace = @namespace;
         ClassName = className;
+        TypeParameters = typeParameters;
         Accessibility = accessibility;
         AlreadyImplementsInpc = alreadyImplementsInpc;
         Fields = fields;

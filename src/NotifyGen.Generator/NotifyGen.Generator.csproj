@@ -6,8 +6,26 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <NoWarn>$(NoWarn);RS2008</NoWarn>
+    <NoWarn>$(NoWarn);RS2008;NU5128</NoWarn>
     <IsRoslynComponent>true</IsRoslynComponent>
+
+    <!-- NuGet Package Metadata -->
+    <PackageId>NotifyGen</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>George Wall</Authors>
+    <Description>Source generator that eliminates INotifyPropertyChanged boilerplate. Just add [Notify] to your partial class and properties are auto-generated with change notification, equality guards, and partial hooks.</Description>
+    <PackageTags>MVVM;INotifyPropertyChanged;WPF;MAUI;Blazor;SourceGenerator;CodeGeneration;Roslyn</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/georgepwall1991/NotifyGen</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/georgepwall1991/NotifyGen</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Copyright>Copyright (c) 2025 George Wall</Copyright>
+
+    <!-- Analyzer/Generator packaging -->
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,7 +34,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NotifyGen.Attributes\NotifyGen.Attributes.csproj" />
+    <ProjectReference Include="..\NotifyGen.Attributes\NotifyGen.Attributes.csproj" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Pack the generator and attributes correctly -->
+  <ItemGroup>
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="$(OutputPath)\NotifyGen.Attributes.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="$(OutputPath)\NotifyGen.Attributes.dll" Pack="true" PackagePath="lib/netstandard2.0" Visible="false" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

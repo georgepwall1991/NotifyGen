@@ -5,6 +5,23 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
+
+    <!-- NuGet Package Metadata -->
+    <PackageId>NotifyGen.Attributes</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>George Wall</Authors>
+    <Description>Attributes for the NotifyGen source generator. Use [Notify] on partial classes to auto-generate INotifyPropertyChanged implementations.</Description>
+    <PackageTags>MVVM;INotifyPropertyChanged;WPF;MAUI;Blazor;SourceGenerator;Attributes</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/georgepwall1991/NotifyGen</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/georgepwall1991/NotifyGen</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Copyright>Copyright (c) 2025 George Wall</Copyright>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
 </Project>
