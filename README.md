@@ -1,3 +1,5 @@
+![NotifyGen Banner](https://raw.githubusercontent.com/georgepwall1991/NotifyGen/main/assets/header.png)
+
 # NotifyGen
 
 [![NuGet](https://img.shields.io/nuget/v/NotifyGen.svg)](https://www.nuget.org/packages/NotifyGen/)
