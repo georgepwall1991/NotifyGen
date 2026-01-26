@@ -19,6 +19,7 @@ jobs:
         dotnet-version: |
           8.0.x
           9.0.x
+          10.0.x
 
     - name: Restore dependencies
       run: dotnet restore
@@ -32,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: [net8.0, net9.0]
+        framework: [net8.0, net9.0, net10.0]
 
     steps:
     - uses: actions/checkout@v4
@@ -43,6 +44,7 @@ jobs:
         dotnet-version: |
           8.0.x
           9.0.x
+          10.0.x
 
     - name: Restore dependencies
       run: dotnet restore
@@ -63,7 +65,7 @@ jobs:
           /p:Threshold=80
 
     - name: Generate Coverage Report
-      if: matrix.framework == 'net9.0'
+      if: matrix.framework == 'net10.0'
       uses: danielpalme/ReportGenerator-GitHub-Action@5.2.0
       with:
         reports: '**/TestResults/*.cobertura.xml'
@@ -72,7 +74,7 @@ jobs:
         verbosity: 'Info'
 
     - name: Upload Coverage Report
-      if: matrix.framework == 'net9.0'
+      if: matrix.framework == 'net10.0'
       uses: actions/upload-artifact@v4
       with:
         name: coverage-report
@@ -80,7 +82,7 @@ jobs:
         retention-days: 7
 
     - name: Upload coverage reports to Codecov
-      if: matrix.framework == 'net9.0'
+      if: matrix.framework == 'net10.0'
       uses: codecov/codecov-action@v4
       with:
         files: '**/TestResults/*.cobertura.xml'
@@ -101,6 +103,7 @@ jobs:
         dotnet-version: |
           8.0.x
           9.0.x
+          10.0.x
 
     - name: Install Stryker.NET
       run: dotnet tool install --global dotnet-stryker
@@ -141,6 +144,7 @@ jobs:
         dotnet-version: |
           8.0.x
           9.0.x
+          10.0.x
 
     - name: Restore dependencies
       run: dotnet restore
@@ -172,6 +176,7 @@ jobs:
         dotnet-version: |
           8.0.x
           9.0.x
+          10.0.x
 
     - name: Restore dependencies
       run: dotnet restore
@@ -179,7 +184,7 @@ jobs:
     - name: Run Competitor Benchmarks
       run: |
         cd benchmarks/NotifyGen.Benchmarks
-        dotnet run -c Release -f net9.0 -- --filter *CompetitorBenchmarks* --exporters json
+        dotnet run -c Release -f net10.0 -- --filter *CompetitorBenchmarks* --exporters json
 
     - name: Upload Benchmark Results
       uses: actions/upload-artifact@v4

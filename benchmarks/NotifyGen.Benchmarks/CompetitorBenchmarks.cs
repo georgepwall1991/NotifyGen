@@ -12,6 +12,7 @@ namespace NotifyGen.Benchmarks;
 /// - Fody PropertyChanged (IL weaving)
 /// </summary>
 [SimpleJob(RuntimeMoniker.Net90)]
+[SimpleJob(RuntimeMoniker.Net100)]
 [MemoryDiagnoser]
 [RankColumn]
 [GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
