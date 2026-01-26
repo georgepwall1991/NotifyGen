@@ -4,3 +4,22 @@ obj/
 riderModule.iml
 /_ReSharper.Caches/nupkg/
 nupkg/
+
+# Test artifacts
+TestResults/
+**/TestResults/
+*.cobertura.xml
+*.opencover.xml
+
+# Benchmark artifacts
+BenchmarkDotNet.Artifacts/
+
+# Stryker
+StrykerOutput/
+stryker-config.json
+
+# Fody generated
+FodyWeavers.xsd
+
+# Complexity logs
+.complexity-log.md
