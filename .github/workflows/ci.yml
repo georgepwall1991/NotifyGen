@@ -66,7 +66,7 @@ jobs:
       if: matrix.framework == 'net9.0'
       uses: danielpalme/ReportGenerator-GitHub-Action@5.2.0
       with:
-        reports: '**/TestResults/coverage.cobertura.xml'
+        reports: '**/TestResults/*.cobertura.xml'
         targetdir: 'coveragereport'
         reporttypes: 'HtmlInline_AzurePipelines;Cobertura;Badges'
         verbosity: 'Info'
@@ -83,7 +83,7 @@ jobs:
       if: matrix.framework == 'net9.0'
       uses: codecov/codecov-action@v4
       with:
-        files: '**/TestResults/coverage.cobertura.xml'
+        files: '**/TestResults/*.cobertura.xml'
         fail_ci_if_error: false
       continue-on-error: true
 
