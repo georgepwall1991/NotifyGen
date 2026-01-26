@@ -8,6 +8,7 @@
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <NoWarn>$(NoWarn);RS2008;NU5128</NoWarn>
     <IsRoslynComponent>true</IsRoslynComponent>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
 
     <!-- NuGet Package Metadata -->
     <PackageId>NotifyGen</PackageId>
@@ -28,6 +29,11 @@
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
   </PropertyGroup>
+
+  <!-- Expose internals to test project -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="NotifyGen.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />

@@ -466,4 +466,296 @@ public class AnalyzerTests
 
         return changedText.ToString();
     }
+
+    #region Additional Analyzer Tests
+
+    [Fact]
+    public async Task Analyzer_ClassWithoutNotifyAttribute_ReportsNoDiagnostics()
+    {
+        // Arrange
+        var source = """
+            namespace TestNamespace
+            {
+                public class Person
+                {
+                    private string _name;
+                }
+            }
+            """;
+
+        // Act
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        // Assert
+        diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Analyzer_PartialClassWithOnlyIgnoredFields_ReportsWarning()
+    {
+        // Arrange
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class OnlyIgnored
+                {
+                    [NotifyIgnore]
+                    private string _ignored1;
+
+                    [NotifyIgnore]
+                    private string _ignored2;
+                }
+            }
+            """;
+
+        // Act
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        // Assert
+        // Should report NOTIFY002 (no fields to generate)
+        diagnostics.Should().ContainSingle(d => d.Id == "NOTIFY002");
+    }
+
+    [Fact]
+    public async Task Analyzer_AbstractClass_ReportsNonPartialError()
+    {
+        // Arrange
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public abstract class AbstractPerson
+                {
+                    private string _name;
+                }
+            }
+            """;
+
+        // Act
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        // Assert
+        diagnostics.Should().ContainSingle(d => d.Id == "NOTIFY001");
+    }
+
+    [Fact]
+    public async Task Analyzer_StaticClass_ReportsNonPartialError()
+    {
+        // Arrange
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public static class StaticPerson
+                {
+                    private static string _name;
+                }
+            }
+            """;
+
+        // Act
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        // Assert
+        // Static class can't be partial with instance members, analyzer should report error
+        diagnostics.Should().ContainSingle(d => d.Id == "NOTIFY001");
+    }
+
+    #endregion
+
+    #region CodeFix Provider Tests
+
+    [Fact]
+    public void CodeFix_GetFixAllProvider_ReturnsBatchFixer()
+    {
+        // Arrange
+        var codeFixer = new NotifyCodeFixProvider();
+
+        // Act
+        var fixAllProvider = codeFixer.GetFixAllProvider();
+
+        // Assert
+        fixAllProvider.Should().Be(WellKnownFixAllProviders.BatchFixer);
+    }
+
+    [Fact]
+    public void CodeFix_FixableDiagnosticIds_ContainsNotify001()
+    {
+        // Arrange
+        var codeFixer = new NotifyCodeFixProvider();
+
+        // Act
+        var fixableIds = codeFixer.FixableDiagnosticIds;
+
+        // Assert
+        fixableIds.Should().ContainSingle();
+        fixableIds[0].Should().Be("NOTIFY001");
+    }
+
+    [Fact]
+    public async Task CodeFix_AbstractClass_AddsPartialModifier()
+    {
+        // Arrange
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public abstract class Person
+                {
+                    private string _name;
+                }
+            }
+            """;
+
+        var expectedFixed = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public abstract partial class Person
+                {
+                    private string _name;
+                }
+            }
+            """;
+
+        // Act
+        var fixedSource = await ApplyCodeFixAsync(source);
+
+        // Assert
+        fixedSource.Should().Be(expectedFixed);
+    }
+
+    [Fact]
+    public async Task CodeFix_NestedClass_AddsPartialModifier()
+    {
+        // Arrange
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                public class Outer
+                {
+                    [Notify]
+                    public class Inner
+                    {
+                        private string _value;
+                    }
+                }
+            }
+            """;
+
+        var expectedFixed = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                public class Outer
+                {
+                    [Notify]
+                    public partial class Inner
+                    {
+                        private string _value;
+                    }
+                }
+            }
+            """;
+
+        // Act
+        var fixedSource = await ApplyCodeFixAsync(source);
+
+        // Assert
+        fixedSource.Should().Be(expectedFixed);
+    }
+
+    #endregion
+
+    #region NotifyAlso with Custom Property Name Tests
+
+    [Fact]
+    public async Task Analyzer_NotifyAlsoWithCustomPropertyName_ReportsNoDiagnostics()
+    {
+        // Arrange - NotifyAlso referencing a property that will be generated with NotifyName
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class Person
+                {
+                    [NotifyAlso("DisplayName")]
+                    private string _firstName;
+
+                    [NotifyName("DisplayName")]
+                    private string _lastName;
+                }
+            }
+            """;
+
+        // Act
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        // Assert
+        diagnostics.Should().BeEmpty();
+    }
+
+    #endregion
+
+    #region Diagnostic Descriptors Tests
+
+    [Fact]
+    public void DiagnosticDescriptors_ClassMustBePartial_HasCorrectProperties()
+    {
+        // Act
+        var descriptor = DiagnosticDescriptors.ClassMustBePartial;
+
+        // Assert
+        descriptor.Id.Should().Be("NOTIFY001");
+        descriptor.Title.ToString().Should().NotBeEmpty();
+        descriptor.Category.Should().Be("NotifyGen");
+        descriptor.DefaultSeverity.Should().Be(DiagnosticSeverity.Error);
+        descriptor.IsEnabledByDefault.Should().BeTrue();
+    }
+
+    [Fact]
+    public void DiagnosticDescriptors_NoEligibleFields_HasCorrectProperties()
+    {
+        // Act
+        var descriptor = DiagnosticDescriptors.NoEligibleFields;
+
+        // Assert
+        descriptor.Id.Should().Be("NOTIFY002");
+        descriptor.Title.ToString().Should().NotBeEmpty();
+        descriptor.Category.Should().Be("NotifyGen");
+        descriptor.DefaultSeverity.Should().Be(DiagnosticSeverity.Warning);
+        descriptor.IsEnabledByDefault.Should().BeTrue();
+    }
+
+    [Fact]
+    public void DiagnosticDescriptors_UnknownNotifyAlsoProperty_HasCorrectProperties()
+    {
+        // Act
+        var descriptor = DiagnosticDescriptors.UnknownNotifyAlsoProperty;
+
+        // Assert
+        descriptor.Id.Should().Be("NOTIFY003");
+        descriptor.Title.ToString().Should().NotBeEmpty();
+        descriptor.Category.Should().Be("NotifyGen");
+        descriptor.DefaultSeverity.Should().Be(DiagnosticSeverity.Warning);
+        descriptor.IsEnabledByDefault.Should().BeTrue();
+    }
+
+    #endregion
 }

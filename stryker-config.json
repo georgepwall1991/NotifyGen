@@ -1,0 +1,32 @@
+{
+  "stryker-config": {
+    "project-info": {
+      "name": "NotifyGen",
+      "version": "1.0.0"
+    },
+    "test-projects": [
+      "./tests/NotifyGen.Tests/NotifyGen.Tests.csproj"
+    ],
+    "project": "src/NotifyGen.Generator/NotifyGen.Generator.csproj",
+    "thresholds": {
+      "high": 90,
+      "low": 80,
+      "break": 70
+    },
+    "reporters": [
+      "html",
+      "json",
+      "progress"
+    ],
+    "mutate": [
+      "src/**/*.cs",
+      "!src/**/obj/**",
+      "!src/**/bin/**"
+    ],
+    "log-level": "info",
+    "concurrency": 4,
+    "ignore-methods": [
+      "GetHashCode"
+    ]
+  }
+}
