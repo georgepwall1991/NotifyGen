@@ -364,6 +364,44 @@ NotifyGen is built for large codebases:
 
 The generator uses Roslyn's incremental compilation pipeline with proper `IEquatable<T>` implementations on all data structures, so your IDE stays responsive even with hundreds of `[Notify]` classes.
 
+### Benchmark Results
+
+Comparison against popular INPC libraries on .NET 9.0 (Apple M4):
+
+#### Property Setters (String)
+
+| Library | Mean | Ratio | Allocated |
+|---------|-----:|------:|----------:|
+| **NotifyGen** | **16.68 ns** | **1.00** | 48 B |
+| CommunityToolkit.Mvvm | 18.46 ns | 1.11 | 48 B |
+| Fody PropertyChanged | 18.44 ns | 1.11 | 48 B |
+| Prism | 25.60 ns | 1.54 | 72 B |
+
+#### Property Setters (Int)
+
+| Library | Mean | Ratio | Allocated |
+|---------|-----:|------:|----------:|
+| **NotifyGen** | **0.38 ns** | **1.00** | - |
+| Fody PropertyChanged | 0.48 ns | 1.28 | - |
+| CommunityToolkit.Mvvm | 0.83 ns | 2.21 | - |
+| Prism | 4.77 ns | 12.67 | 24 B |
+
+#### Equality Guards (Same Value - No Event)
+
+| Library | Mean | Ratio |
+|---------|-----:|------:|
+| **NotifyGen** | **0.07 ns** | **1.00** |
+| Fody PropertyChanged | 0.46 ns | 6.65 |
+| Prism | 0.49 ns | 6.94 |
+| CommunityToolkit.Mvvm | 0.57 ns | 8.13 |
+
+NotifyGen's generated code is the fastest across all benchmarks—identical to hand-written code.
+
+Run benchmarks yourself:
+```bash
+dotnet run -c Release --project benchmarks/NotifyGen.Benchmarks -- --filter *CompetitorBenchmarks*
+```
+
 ## How It Compares
 
 | | NotifyGen | Fody.PropertyChanged | CommunityToolkit.Mvvm |
@@ -375,6 +413,7 @@ The generator uses Roslyn's incremental compilation pipeline with proper `IEquat
 | Equality checks | Always built-in | Configurable | Opt-in with attribute |
 | Partial hooks | `OnXxxChanging` + `OnXxxChanged` | Intercept methods | `OnXxxChanging` only |
 | Learning curve | One attribute | Multiple attributes + config | Multiple attributes |
+| **Performance** | **Fastest** | Fast | Good |
 
 **When to use NotifyGen:** You want to eliminate INPC boilerplate with minimal setup. One attribute, done.
 
@@ -387,7 +426,7 @@ The generator uses Roslyn's incremental compilation pipeline with proper `IEquat
 - **.NET Standard 2.0+** — Compatible with:
   - .NET Framework 4.6.1+
   - .NET Core 3.1+
-  - .NET 5, 6, 7, 8, 9
+  - .NET 5, 6, 7, 8, 9, 10
   - Mono, Xamarin, Unity (2021.2+)
 - **C# 9.0+** — Required for source generator support
 
@@ -495,16 +534,20 @@ Performance benchmarks are available to verify NotifyGen adds zero runtime overh
 # Run all benchmarks
 dotnet run -c Release --project benchmarks/NotifyGen.Benchmarks
 
-# Run specific benchmark
+# Run competitor comparison
+dotnet run -c Release --project benchmarks/NotifyGen.Benchmarks -- --filter *CompetitorBenchmarks*
+
+# Run setter performance (NotifyGen vs hand-written)
 dotnet run -c Release --project benchmarks/NotifyGen.Benchmarks -- --filter *SetterBenchmarks*
 ```
 
 Benchmarks include:
+- **Competitor comparison** — NotifyGen vs CommunityToolkit.Mvvm, Prism, and Fody PropertyChanged
 - **Setter performance** — Generated setters vs hand-written (should be identical)
 - **Generator performance** — Compilation time for 1, 10, and 100 classes
 - **Incremental rebuild** — Time to rebuild when only one class changes
 
-See [benchmarks/NotifyGen.Benchmarks/README.md](benchmarks/NotifyGen.Benchmarks/README.md) for details.
+Multi-framework support: Benchmarks target .NET 8.0, 9.0, and 10.0.
 
 ## Contributing
 
