@@ -24,6 +24,16 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     private const string NotifyNameAttributeName = "NotifyGen.NotifyNameAttribute";
     private const string NotifySetterAttributeName = "NotifyGen.NotifySetterAttribute";
 
+    /// <summary>
+    /// Cached SymbolDisplayFormat for type names to avoid repeated allocations.
+    /// </summary>
+    private static readonly SymbolDisplayFormat TypeDisplayFormat = new(
+        globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,
+        typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+        genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
+        miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes
+            | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         // Find all class declarations with [Notify] attribute
@@ -142,13 +152,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 ?? char.ToUpperInvariant(fieldSymbol.Name[1]) + fieldSymbol.Name.Substring(2);
 
             // Get type name with nullability (use keyword format: string instead of System.String)
-            var typeFormat = new SymbolDisplayFormat(
-                globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,
-                typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
-                genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
-                miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes
-                    | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
-            var typeName = fieldSymbol.Type.ToDisplayString(typeFormat);
+            var typeName = fieldSymbol.Type.ToDisplayString(TypeDisplayFormat);
 
             // Check nullability
             var isNullable = fieldSymbol.Type.NullableAnnotation == NullableAnnotation.Annotated
@@ -182,10 +186,44 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 };
             }
 
-            fields.Add(new FieldInfo(fieldSymbol.Name, propertyName, typeName, isNullable, alsoNotify, setterAccess));
+            // Check if primitive type for optimized equality
+            var isPrimitiveType = IsPrimitiveValueType(fieldSymbol.Type);
+
+            fields.Add(new FieldInfo(fieldSymbol.Name, propertyName, typeName, isNullable, alsoNotify, setterAccess, isPrimitiveType));
         }
 
         return fields.ToImmutableArray();
+    }
+
+    /// <summary>
+    /// Determines if the type is a primitive value type that supports direct == comparison.
+    /// </summary>
+    private static bool IsPrimitiveValueType(ITypeSymbol type)
+    {
+        // Handle Nullable<T> - get the underlying type
+        if (type is INamedTypeSymbol namedType &&
+            namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+        {
+            type = namedType.TypeArguments[0];
+        }
+
+        return type.IsValueType && type.SpecialType switch
+        {
+            SpecialType.System_Boolean => true,
+            SpecialType.System_Char => true,
+            SpecialType.System_SByte => true,
+            SpecialType.System_Byte => true,
+            SpecialType.System_Int16 => true,
+            SpecialType.System_UInt16 => true,
+            SpecialType.System_Int32 => true,
+            SpecialType.System_UInt32 => true,
+            SpecialType.System_Int64 => true,
+            SpecialType.System_UInt64 => true,
+            SpecialType.System_Single => true,
+            SpecialType.System_Double => true,
+            SpecialType.System_Decimal => true,
+            _ => false
+        };
     }
 
     /// <summary>
@@ -272,7 +310,15 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         var setterModifier = field.SetterAccess != null ? $"{field.SetterAccess} " : "";
         sb.AppendLine($"{indent}        {setterModifier}set");
         sb.AppendLine($"{indent}        {{");
-        sb.AppendLine($"{indent}            if (EqualityComparer<{field.TypeName}>.Default.Equals({field.FieldName}, value)) return;");
+        // Use direct == for primitive types (faster), EqualityComparer for complex types
+        if (field.IsPrimitiveType)
+        {
+            sb.AppendLine($"{indent}            if ({field.FieldName} == value) return;");
+        }
+        else
+        {
+            sb.AppendLine($"{indent}            if (EqualityComparer<{field.TypeName}>.Default.Equals({field.FieldName}, value)) return;");
+        }
         sb.AppendLine($"{indent}            On{field.PropertyName}Changing({field.FieldName}, value);");
         sb.AppendLine($"{indent}            {field.FieldName} = value;");
         sb.AppendLine($"{indent}            OnPropertyChanged();");
