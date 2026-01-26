@@ -1,4 +1,8 @@
-![NotifyGen Banner](https://raw.githubusercontent.com/georgepwall1991/NotifyGen/main/assets/header.png)
+![NotifyGen Banner](https://raw.githubusercontent.com/georgepwall1991/NotifyGen/master/assets/header.png)
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/georgepwall1991/NotifyGen/master/assets/icon.png" alt="NotifyGen Icon" width="128" height="128" />
+</p>
 
 # NotifyGen
 
