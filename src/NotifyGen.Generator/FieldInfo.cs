@@ -40,13 +40,20 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
     /// </summary>
     public string? SetterAccess { get; }
 
+    /// <summary>
+    /// Whether the type is a primitive value type (int, bool, double, etc.)
+    /// that supports direct == comparison for better performance.
+    /// </summary>
+    public bool IsPrimitiveType { get; }
+
     public FieldInfo(
         string fieldName,
         string propertyName,
         string typeName,
         bool isNullable,
         ImmutableArray<string> alsoNotify,
-        string? setterAccess = null)
+        string? setterAccess = null,
+        bool isPrimitiveType = false)
     {
         FieldName = fieldName;
         PropertyName = propertyName;
@@ -54,6 +61,7 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         IsNullable = isNullable;
         AlsoNotify = alsoNotify;
         SetterAccess = setterAccess;
+        IsPrimitiveType = isPrimitiveType;
     }
 
     public bool Equals(FieldInfo other)
@@ -63,6 +71,7 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             && TypeName == other.TypeName
             && IsNullable == other.IsNullable
             && SetterAccess == other.SetterAccess
+            && IsPrimitiveType == other.IsPrimitiveType
             && AlsoNotify.SequenceEqual(other.AlsoNotify);
     }
 
@@ -81,6 +90,7 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             hash = hash * 31 + (TypeName?.GetHashCode() ?? 0);
             hash = hash * 31 + IsNullable.GetHashCode();
             hash = hash * 31 + (SetterAccess?.GetHashCode() ?? 0);
+            hash = hash * 31 + IsPrimitiveType.GetHashCode();
             hash = hash * 31 + AlsoNotify.Length;
 
             // Include first element hash for better distribution when arrays differ

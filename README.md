@@ -85,7 +85,7 @@ public partial class Person : INotifyPropertyChanged
         get => _age;
         set
         {
-            if (EqualityComparer<int>.Default.Equals(_age, value)) return;
+            if (_age == value) return;  // Direct comparison for primitives
             OnAgeChanging(_age, value);
             _age = value;
             OnPropertyChanged();
@@ -223,10 +223,14 @@ The underscore is stripped and the first letter is capitalized.
 Every generated setter checks if the value actually changed before doing anything:
 
 ```csharp
+// For primitive types (int, bool, double, etc.) - direct comparison
+if (_age == value) return;
+
+// For reference types and complex value types - EqualityComparer
 if (EqualityComparer<string>.Default.Equals(_name, value)) return;
 ```
 
-This prevents unnecessary `PropertyChanged` events and infinite loops from two-way bindings. Works correctly with nulls, value types, and reference types.
+NotifyGen automatically detects primitive types and uses direct `==` comparison for maximum performance. This prevents unnecessary `PropertyChanged` events and infinite loops from two-way bindings. Works correctly with nulls, value types, and reference types.
 
 ### Dependent Properties with `[NotifyAlso]`
 
@@ -378,30 +382,30 @@ Comparison against popular INPC libraries on .NET 9.0 (Apple M4):
 
 | Library | Mean | Ratio | Allocated |
 |---------|-----:|------:|----------:|
-| **NotifyGen** | **16.68 ns** | **1.00** | 48 B |
-| CommunityToolkit.Mvvm | 18.46 ns | 1.11 | 48 B |
-| Fody PropertyChanged | 18.44 ns | 1.11 | 48 B |
-| Prism | 25.60 ns | 1.54 | 72 B |
+| **NotifyGen** | **17.57 ns** | **1.00** | 48 B |
+| CommunityToolkit.Mvvm | 18.47 ns | 1.05 | 48 B |
+| Fody PropertyChanged | 18.50 ns | 1.05 | 48 B |
+| Prism | 26.28 ns | 1.50 | 72 B |
 
 #### Property Setters (Int)
 
 | Library | Mean | Ratio | Allocated |
 |---------|-----:|------:|----------:|
-| **NotifyGen** | **0.38 ns** | **1.00** | - |
-| Fody PropertyChanged | 0.48 ns | 1.28 | - |
-| CommunityToolkit.Mvvm | 0.83 ns | 2.21 | - |
-| Prism | 4.77 ns | 12.67 | 24 B |
+| Fody PropertyChanged | 0.46 ns | 0.92 | - |
+| **NotifyGen** | **0.50 ns** | **1.00** | - |
+| CommunityToolkit.Mvvm | 0.91 ns | 1.81 | - |
+| Prism | 5.01 ns | 9.99 | 24 B |
 
 #### Equality Guards (Same Value - No Event)
 
 | Library | Mean | Ratio |
 |---------|-----:|------:|
-| **NotifyGen** | **0.07 ns** | **1.00** |
-| Fody PropertyChanged | 0.46 ns | 6.65 |
-| Prism | 0.49 ns | 6.94 |
-| CommunityToolkit.Mvvm | 0.57 ns | 8.13 |
+| Fody PropertyChanged | 0.48 ns | 0.93 |
+| Prism | 0.50 ns | 0.97 |
+| **NotifyGen** | **0.52 ns** | **1.00** |
+| CommunityToolkit.Mvvm | 0.52 ns | 1.01 |
 
-NotifyGen's generated code is the fastest across all benchmarks—identical to hand-written code.
+NotifyGen is the **fastest for string property setters** and competitive across all benchmarks. Primitive types (int, bool, double, etc.) use direct `==` comparison for optimal performance.
 
 Run benchmarks yourself:
 ```bash
