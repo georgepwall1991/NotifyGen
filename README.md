@@ -1,7 +1,9 @@
 # NotifyGen
 
 [![NuGet](https://img.shields.io/nuget/v/NotifyGen.svg)](https://www.nuget.org/packages/NotifyGen/)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/NotifyGen.svg)](https://www.nuget.org/packages/NotifyGen/)
 [![Build Status](https://github.com/georgepwall1991/NotifyGen/actions/workflows/ci.yml/badge.svg)](https://github.com/georgepwall1991/NotifyGen/actions/workflows/ci.yml)
+[![.NET](https://img.shields.io/badge/.NET-Standard%202.0%2B-512BD4)](https://dotnet.microsoft.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **Stop writing INotifyPropertyChanged boilerplate. Let the compiler do it.**
@@ -339,15 +341,17 @@ public partial class MyViewModel : ViewModelBase
 }
 ```
 
-## Built-in Analyzers
+## Built-in Analyzers & Code Fixes
 
 NotifyGen includes analyzers that catch mistakes at compile time:
 
-| Code | Severity | Description |
-|------|----------|-------------|
-| NOTIFY001 | Error | Class with `[Notify]` must be declared `partial` |
-| NOTIFY002 | Warning | No eligible fields found (need private `_underscore` fields) |
-| NOTIFY003 | Warning | `[NotifyAlso("Xyz")]` references property `Xyz` that doesn't exist |
+| Code | Severity | Description | Auto-Fix |
+|------|----------|-------------|----------|
+| NOTIFY001 | Error | Class with `[Notify]` must be declared `partial` | Yes |
+| NOTIFY002 | Warning | No eligible fields found (need private `_underscore` fields) | — |
+| NOTIFY003 | Warning | `[NotifyAlso("Xyz")]` references property `Xyz` that doesn't exist | — |
+
+**NOTIFY001 has a code fix** — when you see the error, click the lightbulb (or press `Ctrl+.` / `Cmd+.`) and select "Make class partial" to automatically add the `partial` modifier.
 
 ## Performance
 
@@ -453,6 +457,54 @@ public partial class MyClass
     private string _name;
 }
 ```
+
+## Samples
+
+The repository includes sample projects to help you get started:
+
+### Console Sample (Cross-Platform)
+
+A simple console app demonstrating all NotifyGen features without any UI framework dependencies:
+
+```bash
+dotnet run --project samples/NotifyGen.ConsoleSample
+```
+
+This sample shows:
+- Basic property generation
+- `[NotifyAlso]` for dependent properties
+- `[NotifyName]` for custom property names
+- `[NotifySetter]` for access control
+- `[NotifyIgnore]` for excluded fields
+- Partial hooks for validation and side effects
+- Equality guards preventing duplicate events
+
+### WPF Sample (Windows)
+
+A WPF application demonstrating data binding with generated properties:
+
+```bash
+dotnet run --project samples/NotifyGen.WpfSample
+```
+
+## Benchmarks
+
+Performance benchmarks are available to verify NotifyGen adds zero runtime overhead:
+
+```bash
+# Run all benchmarks
+dotnet run -c Release --project benchmarks/NotifyGen.Benchmarks
+
+# Run specific benchmark
+dotnet run -c Release --project benchmarks/NotifyGen.Benchmarks -- --filter *SetterBenchmarks*
+```
+
+Benchmarks include:
+- **Setter performance** — Generated setters vs hand-written (should be identical)
+- **Generator performance** — Compilation time for 1, 10, and 100 classes
+- **Incremental rebuild** — Time to rebuild when only one class changes
+
+See [benchmarks/NotifyGen.Benchmarks/README.md](benchmarks/NotifyGen.Benchmarks/README.md) for details.
 
 ## Contributing
 
