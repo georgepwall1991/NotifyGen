@@ -1,11 +1,13 @@
+using System;
 using System.Collections.Immutable;
+using System.Linq;
 
 namespace NotifyGen.Generator;
 
 /// <summary>
 /// Represents metadata about a field that will become a generated property.
 /// </summary>
-internal readonly struct FieldInfo
+internal readonly struct FieldInfo : IEquatable<FieldInfo>
 {
     /// <summary>
     /// The field name (e.g., "_name").
@@ -53,4 +55,44 @@ internal readonly struct FieldInfo
         AlsoNotify = alsoNotify;
         SetterAccess = setterAccess;
     }
+
+    public bool Equals(FieldInfo other)
+    {
+        return FieldName == other.FieldName
+            && PropertyName == other.PropertyName
+            && TypeName == other.TypeName
+            && IsNullable == other.IsNullable
+            && SetterAccess == other.SetterAccess
+            && AlsoNotify.SequenceEqual(other.AlsoNotify);
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj is FieldInfo other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        unchecked
+        {
+            var hash = 17;
+            hash = hash * 31 + (FieldName?.GetHashCode() ?? 0);
+            hash = hash * 31 + (PropertyName?.GetHashCode() ?? 0);
+            hash = hash * 31 + (TypeName?.GetHashCode() ?? 0);
+            hash = hash * 31 + IsNullable.GetHashCode();
+            hash = hash * 31 + (SetterAccess?.GetHashCode() ?? 0);
+            hash = hash * 31 + AlsoNotify.Length;
+
+            // Include first element hash for better distribution when arrays differ
+            if (AlsoNotify.Length > 0)
+            {
+                hash = hash * 31 + (AlsoNotify[0]?.GetHashCode() ?? 0);
+            }
+
+            return hash;
+        }
+    }
+
+    public static bool operator ==(FieldInfo left, FieldInfo right) => left.Equals(right);
+    public static bool operator !=(FieldInfo left, FieldInfo right) => !left.Equals(right);
 }
