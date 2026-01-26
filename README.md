@@ -48,18 +48,69 @@ public partial class Person
 }
 ```
 
-That's 6 lines. NotifyGen generates the rest at compile time—properties, change notification, equality checks, and partial hooks. No runtime reflection. No IL weaving. Just clean, debuggable C#.
+NotifyGen generates the rest at compile time. No runtime reflection. No IL weaving. Just clean, debuggable C#.
 
-## What You Get
+## What Gets Generated
 
-For each field, NotifyGen generates:
+For the `Person` class above, NotifyGen generates:
 
-- **A public property** with proper getter and setter
-- **Equality guard** - `PropertyChanged` only fires when the value actually changes
-- **Partial hooks** - `OnXxxChanging()` and `OnXxxChanged()` for validation or side effects
-- **Full INotifyPropertyChanged implementation** if your class doesn't already have one
+```csharp
+public partial class Person : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
 
-The generated code is visible in your IDE. You can step through it in the debugger. It's just regular C#.
+    public string Name
+    {
+        get => _name;
+        set
+        {
+            if (EqualityComparer<string>.Default.Equals(_name, value)) return;
+            OnNameChanging(_name, value);
+            _name = value;
+            OnPropertyChanged();
+            OnNameChanged();
+        }
+    }
+
+    public int Age
+    {
+        get => _age;
+        set
+        {
+            if (EqualityComparer<int>.Default.Equals(_age, value)) return;
+            OnAgeChanging(_age, value);
+            _age = value;
+            OnPropertyChanged();
+            OnAgeChanged();
+        }
+    }
+
+    public string? Email
+    {
+        get => _email;
+        set
+        {
+            if (EqualityComparer<string?>.Default.Equals(_email, value)) return;
+            OnEmailChanging(_email, value);
+            _email = value;
+            OnPropertyChanged();
+            OnEmailChanged();
+        }
+    }
+
+    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+    partial void OnNameChanging(string oldValue, string newValue);
+    partial void OnNameChanged();
+    partial void OnAgeChanging(int oldValue, int newValue);
+    partial void OnAgeChanged();
+    partial void OnEmailChanging(string? oldValue, string? newValue);
+    partial void OnEmailChanged();
+}
+```
+
+This generated code is visible in your IDE (look under Dependencies → Analyzers → NotifyGen). You can step through it in the debugger.
 
 ## Installation
 
@@ -67,146 +118,348 @@ The generated code is visible in your IDE. You can step through it in the debugg
 dotnet add package NotifyGen
 ```
 
-## Features
+Or via Package Manager:
+```
+Install-Package NotifyGen
+```
 
-### Dependent Properties with `[NotifyAlso]`
+## Real-World Example
 
-Got a computed property that depends on other fields? Tell NotifyGen to notify it too:
+Here's a more complete ViewModel showing several features working together:
 
 ```csharp
+using NotifyGen;
+
 [Notify]
-public partial class Person
+public partial class CustomerViewModel
 {
-    [NotifyAlso("FullName")]
+    // Basic properties - just declare the field
     private string _firstName;
-
-    [NotifyAlso("FullName")]
     private string _lastName;
+    private string? _email;
 
-    public string FullName => $"{FirstName} {LastName}";
+    // Notify dependent properties when these change
+    [NotifyAlso("FullName")]
+    [NotifyAlso("CanSave")]
+    private string _company;
+
+    // Private setter - can only be set internally
+    [NotifySetter(AccessLevel.Private)]
+    private int _id;
+
+    // Custom property name
+    [NotifyName("IsPreferredCustomer")]
+    private bool _preferred;
+
+    // Exclude from generation - manage manually
+    [NotifyIgnore]
+    private readonly ICustomerService _customerService;
+
+    // Computed property that depends on FirstName and LastName
+    public string FullName => $"{FirstName} {LastName}".Trim();
+
+    // Validation property
+    public bool CanSave => !string.IsNullOrWhiteSpace(FirstName)
+                        && !string.IsNullOrWhiteSpace(Company);
+
+    public CustomerViewModel(ICustomerService customerService)
+    {
+        _customerService = customerService;
+    }
+
+    // Hook into property changes for validation
+    partial void OnFirstNameChanging(string oldValue, string newValue)
+    {
+        if (newValue?.Length > 100)
+            throw new ArgumentException("First name too long");
+    }
+
+    // React to changes
+    partial void OnEmailChanged()
+    {
+        // Maybe validate email format, update UI state, etc.
+        ValidateEmail();
+    }
 }
 ```
 
-Now when `FirstName` or `LastName` changes, your UI updates `FullName` automatically.
+Bind it in XAML:
+
+```xml
+<StackPanel DataContext="{Binding CustomerViewModel}">
+    <TextBox Text="{Binding FirstName, UpdateSourceTrigger=PropertyChanged}" />
+    <TextBox Text="{Binding LastName, UpdateSourceTrigger=PropertyChanged}" />
+    <TextBlock Text="{Binding FullName}" />
+    <CheckBox IsChecked="{Binding IsPreferredCustomer}" Content="Preferred Customer" />
+    <Button Content="Save" IsEnabled="{Binding CanSave}" />
+</StackPanel>
+```
+
+## Features
+
+### Field Naming Convention
+
+NotifyGen uses underscore-prefixed private fields:
+
+| Field | Generated Property |
+|-------|-------------------|
+| `_name` | `Name` |
+| `_firstName` | `FirstName` |
+| `_isEnabled` | `IsEnabled` |
+| `_id` | `Id` |
+
+The underscore is stripped and the first letter is capitalized.
+
+### Equality Guards
+
+Every generated setter checks if the value actually changed before doing anything:
+
+```csharp
+if (EqualityComparer<string>.Default.Equals(_name, value)) return;
+```
+
+This prevents unnecessary `PropertyChanged` events and infinite loops from two-way bindings. Works correctly with nulls, value types, and reference types.
+
+### Dependent Properties with `[NotifyAlso]`
+
+When one property affects another, use `[NotifyAlso]` to notify both:
+
+```csharp
+[Notify]
+public partial class Rectangle
+{
+    [NotifyAlso("Area")]
+    [NotifyAlso("Perimeter")]
+    private double _width;
+
+    [NotifyAlso("Area")]
+    [NotifyAlso("Perimeter")]
+    private double _height;
+
+    public double Area => Width * Height;
+    public double Perimeter => 2 * (Width + Height);
+}
+```
+
+When `Width` changes, `PropertyChanged` fires for `Width`, `Area`, and `Perimeter`.
 
 ### Custom Property Names with `[NotifyName]`
 
-Don't like the generated name? Override it:
+Override the default naming:
 
 ```csharp
 [NotifyName("IsVisible")]
 private bool _shown;  // Generates IsVisible, not Shown
+
+[NotifyName("CustomerID")]
+private int _custId;  // Generates CustomerID, not CustId
 ```
 
-### Restricted Setters with `[NotifySetter]`
+### Setter Access Control with `[NotifySetter]`
 
-Need a read-only property from outside the class?
+Restrict who can set the property:
 
 ```csharp
 [NotifySetter(AccessLevel.Private)]
-private int _id;  // public int Id { get; private set; }
+private int _id;
+// Result: public int Id { get; private set; }
+
+[NotifySetter(AccessLevel.Protected)]
+private string _internalState;
+// Result: public string InternalState { get; protected set; }
+
+[NotifySetter(AccessLevel.Internal)]
+private DateTime _lastModified;
+// Result: public DateTime LastModified { get; internal set; }
 ```
 
-### Exclude Fields with `[NotifyIgnore]`
+Available levels: `Public`, `Private`, `Protected`, `Internal`, `ProtectedInternal`, `PrivateProtected`
 
-Keep some fields out of the generated properties:
+### Excluding Fields with `[NotifyIgnore]`
 
-```csharp
-[NotifyIgnore]
-private string _internalCache;  // No property generated
-```
-
-### Partial Hooks for Custom Logic
-
-Every property gets two hooks you can implement:
+Some fields shouldn't become properties:
 
 ```csharp
 [Notify]
-public partial class Order
+public partial class ViewModel
 {
-    private decimal _total;
+    private string _name;  // Generates property
 
-    partial void OnTotalChanging(decimal oldValue, decimal newValue)
-    {
-        // Validate before the change
-        if (newValue < 0)
-            throw new ArgumentException("Total cannot be negative");
-    }
+    [NotifyIgnore]
+    private readonly ILogger _logger;  // No property
 
-    partial void OnTotalChanged()
-    {
-        // React after the change
-        UpdateTaxCalculation();
-    }
+    [NotifyIgnore]
+    private Dictionary<string, object> _cache;  // No property
 }
 ```
 
-Don't need them? Don't implement them. The compiler optimizes away unused partial methods.
+### Partial Hooks
+
+Every property gets two optional hooks:
+
+**`On{Property}Changing(oldValue, newValue)`** - Called before the value changes. Use for validation:
+
+```csharp
+partial void OnAgeChanging(int oldValue, int newValue)
+{
+    if (newValue < 0 || newValue > 150)
+        throw new ArgumentOutOfRangeException(nameof(newValue), "Invalid age");
+}
+```
+
+**`On{Property}Changed()`** - Called after the value changes. Use for side effects:
+
+```csharp
+partial void OnSelectedItemChanged()
+{
+    LoadItemDetails();
+    UpdateCommandStates();
+}
+```
+
+If you don't implement these methods, the compiler removes the calls entirely—no performance cost.
+
+### Working with Existing INotifyPropertyChanged
+
+If your class already implements `INotifyPropertyChanged` (e.g., from a base class), NotifyGen detects this and won't generate a duplicate implementation:
+
+```csharp
+public class ViewModelBase : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected virtual void OnPropertyChanged([CallerMemberName] string? name = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+}
+
+[Notify]
+public partial class MyViewModel : ViewModelBase
+{
+    private string _title;  // Uses base class OnPropertyChanged
+}
+```
 
 ## Built-in Analyzers
 
-NotifyGen catches mistakes at compile time:
+NotifyGen includes analyzers that catch mistakes at compile time:
 
-| Code | What it catches |
-|------|-----------------|
-| NOTIFY001 | Class isn't marked `partial` |
-| NOTIFY002 | No private underscore-prefixed fields found |
-| NOTIFY003 | `[NotifyAlso]` references a property that doesn't exist |
+| Code | Severity | Description |
+|------|----------|-------------|
+| NOTIFY001 | Error | Class with `[Notify]` must be declared `partial` |
+| NOTIFY002 | Warning | No eligible fields found (need private `_underscore` fields) |
+| NOTIFY003 | Warning | `[NotifyAlso("Xyz")]` references property `Xyz` that doesn't exist |
+
+## Performance
+
+NotifyGen is built for large codebases:
+
+- **Incremental generation** - Only regenerates code for classes that actually changed
+- **No runtime overhead** - All code is generated at compile time
+- **Efficient equality checks** - Uses `EqualityComparer<T>.Default` for optimal performance
+- **Zero allocations in setters** - No boxing, no LINQ, no closures
+
+The generator uses Roslyn's incremental compilation pipeline with proper `IEquatable<T>` implementations on all data structures, so your IDE stays responsive even with hundreds of `[Notify]` classes.
 
 ## How It Compares
 
 | | NotifyGen | Fody.PropertyChanged | CommunityToolkit.Mvvm |
 |---|-----------|---------------------|----------------------|
 | Approach | Source Generator | IL Weaving | Source Generator |
-| Runtime dependency | None | None | Yes (runtime library) |
-| Debugging | Step through generated code | Limited | Step through generated code |
-| Build impact | Minimal | Adds post-build step | Minimal |
-| Equality checks | Always (built-in) | Configurable | Optional attribute |
+| Runtime dependency | None | None | Runtime library required |
+| Debugging | Full—step through generated code | Limited—IL is modified | Full—step through generated code |
+| Build impact | Runs during compile | Post-build step | Runs during compile |
+| Equality checks | Always built-in | Configurable | Opt-in with attribute |
+| Partial hooks | `OnXxxChanging` + `OnXxxChanged` | Intercept methods | `OnXxxChanging` only |
+| Learning curve | One attribute | Multiple attributes + config | Multiple attributes |
 
-NotifyGen takes a focused approach: one thing, done well. If you need a full MVVM framework with commands, messaging, and DI, look at CommunityToolkit.Mvvm. If you just want to stop writing property boilerplate, NotifyGen is all you need.
+**When to use NotifyGen:** You want to eliminate INPC boilerplate with minimal setup. One attribute, done.
+
+**When to use CommunityToolkit.Mvvm:** You need a full MVVM framework with commands, messaging, dependency injection, and more.
+
+**When to use Fody:** You have an existing codebase using Fody, or you need IL-level modifications for other reasons.
 
 ## Requirements
 
-- **.NET Standard 2.0+** — works with .NET Framework 4.6.1+, .NET Core 3.1+, .NET 5/6/7/8/9
-- **C# 9.0+** — required for source generators
+- **.NET Standard 2.0+** — Compatible with:
+  - .NET Framework 4.6.1+
+  - .NET Core 3.1+
+  - .NET 5, 6, 7, 8, 9
+  - Mono, Xamarin, Unity (2021.2+)
+- **C# 9.0+** — Required for source generator support
 
 ## Quick Reference
 
 ```csharp
-[Notify]                          // Enable generation for this class
-public partial class MyViewModel  // Must be partial
+[Notify]                              // Enable generation for this class
+public partial class MyViewModel      // Must be partial
 {
-    private string _name;         // Generates Name property
+    private string _name;             // → public string Name { get; set; }
 
     [NotifyIgnore]
-    private int _ignored;         // No property generated
+    private int _internal;            // No property generated
 
     [NotifyAlso("FullName")]
-    private string _firstName;    // Also notifies FullName when changed
+    private string _firstName;        // Also raises PropertyChanged for FullName
 
     [NotifyName("IsActive")]
-    private bool _active;         // Generates IsActive, not Active
+    private bool _active;             // → public bool IsActive { get; set; }
 
     [NotifySetter(AccessLevel.Private)]
-    private int _id;              // public int Id { get; private set; }
+    private int _id;                  // → public int Id { get; private set; }
+
+    // Optional hooks - implement only what you need
+    partial void OnNameChanging(string oldValue, string newValue);
+    partial void OnNameChanged();
 }
 ```
 
 ## Troubleshooting
 
 **Properties not generating?**
-1. Class must be `partial`
-2. Fields must be `private`
-3. Fields must start with `_` (e.g., `_name` → `Name`)
-4. Rebuild the solution
+1. Add `partial` to your class declaration
+2. Make sure fields are `private` (not `public`, `protected`, or `internal`)
+3. Fields must start with underscore: `_name`, not `name` or `m_name`
+4. Rebuild the solution (Ctrl+Shift+B)
 
-**IntelliSense not working?**
-Restart your IDE. Source generators sometimes need a kick.
+**IntelliSense not showing generated properties?**
+- Restart Visual Studio/Rider
+- Check Dependencies → Analyzers → NotifyGen in Solution Explorer
+- Ensure the project builds successfully
+
+**NOTIFY001: Class must be partial?**
+```csharp
+// Wrong
+[Notify]
+public class MyClass { }
+
+// Right
+[Notify]
+public partial class MyClass { }
+```
+
+**NOTIFY002: No eligible fields?**
+```csharp
+// Wrong - no underscore prefix
+[Notify]
+public partial class MyClass
+{
+    private string name;
+}
+
+// Right
+[Notify]
+public partial class MyClass
+{
+    private string _name;
+}
+```
 
 ## Contributing
 
-Found a bug? Have an idea? [Open an issue](https://github.com/georgepwall1991/NotifyGen/issues) or submit a PR.
+Found a bug? Have a feature request? [Open an issue](https://github.com/georgepwall1991/NotifyGen/issues).
+
+Want to contribute code? PRs are welcome. Please include tests for new functionality.
 
 ## License
 
-MIT — use it however you want.
+MIT License — use it in personal projects, commercial projects, wherever. See [LICENSE](LICENSE) for details.
