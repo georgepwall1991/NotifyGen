@@ -13,8 +13,8 @@
     <CollectCoverage>true</CollectCoverage>
     <CoverletOutputFormat>cobertura,opencover</CoverletOutputFormat>
     <CoverletOutput>./TestResults/</CoverletOutput>
-    <Include>[NotifyGen.*]*</Include>
-    <Exclude>[*]*.Program,[*]*.AssemblyInfo</Exclude>
+    <Include>[NotifyGen.Generator]*</Include>
+    <Exclude>[*]*.Program,[*]*.AssemblyInfo,[NotifyGen.Attributes]*</Exclude>
     <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
   </PropertyGroup>
 
