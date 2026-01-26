@@ -11,7 +11,7 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>NotifyGen</PackageId>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>George Wall</Authors>
     <Description>Source generator that eliminates INotifyPropertyChanged boilerplate. Just add [Notify] to your partial class and properties are auto-generated with change notification, equality guards, and partial hooks.</Description>
     <PackageTags>MVVM;INotifyPropertyChanged;WPF;MAUI;Blazor;SourceGenerator;CodeGeneration;Roslyn</PackageTags>
