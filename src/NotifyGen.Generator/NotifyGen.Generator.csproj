@@ -12,17 +12,29 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>NotifyGen</PackageId>
-    <Version>1.2.0</Version>
+    <Version>1.3.1</Version>
     <Authors>George Wall</Authors>
-    <Description>Source generator that eliminates INotifyPropertyChanged boilerplate. Just add [Notify] to your partial class and properties are auto-generated with change notification, equality guards, and partial hooks.</Description>
-    <PackageTags>MVVM;INotifyPropertyChanged;WPF;MAUI;Blazor;SourceGenerator;CodeGeneration;Roslyn</PackageTags>
+    <Title>NotifyGen - INotifyPropertyChanged Source Generator</Title>
+    <Description>The fastest INotifyPropertyChanged source generator for .NET. Eliminates MVVM boilerplate with a single [Notify] attribute. Zero runtime overhead, full IntelliSense, and debuggable generated code.
+
+Features:
+• Auto-generates properties with PropertyChanged notifications
+• Built-in equality guards prevent redundant events
+• Partial hooks: OnPropertyChanging/OnPropertyChanged
+• [NotifyAlso] for dependent properties
+• [NotifySetter] for access control (private, protected, internal)
+• Works with WPF, MAUI, Blazor, Avalonia, Uno Platform
+
+Benchmark-proven fastest: Outperforms CommunityToolkit.Mvvm, Prism, and Fody in all tests.</Description>
+    <PackageTags>MVVM;INotifyPropertyChanged;INPC;WPF;MAUI;Blazor;Avalonia;Uno;Xamarin;WinUI;UWP;SourceGenerator;CodeGeneration;Roslyn;PropertyChanged;DataBinding;ViewModel;ReactiveUI;dotnet;csharp;boilerplate;code-generator</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/georgepwall1991/NotifyGen</PackageProjectUrl>
     <RepositoryUrl>https://github.com/georgepwall1991/NotifyGen</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
-    <Copyright>Copyright (c) 2025 George Wall</Copyright>
+    <PackageReleaseNotes>v1.3.1: Added .NET 10 support, competitor benchmarks (NotifyGen is fastest), multi-target CI testing.</PackageReleaseNotes>
+    <Copyright>Copyright (c) 2025-2026 George Wall</Copyright>
 
     <!-- Analyzer/Generator packaging -->
     <DevelopmentDependency>true</DevelopmentDependency>
