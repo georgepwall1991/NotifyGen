@@ -35,10 +35,21 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
     public ImmutableArray<string> AlsoNotify { get; }
 
     /// <summary>
+    /// Command names to call NotifyCanExecuteChanged() on when this field changes.
+    /// </summary>
+    public ImmutableArray<string> CommandsToNotify { get; }
+
+    /// <summary>
     /// The access modifier for the setter (e.g., "private", "protected").
     /// Null means use the same access as the property (public).
     /// </summary>
     public string? SetterAccess { get; }
+
+    /// <summary>
+    /// Whether the type is a primitive value type (int, bool, double, etc.)
+    /// that supports direct == comparison for better performance.
+    /// </summary>
+    public bool IsPrimitiveType { get; }
 
     public FieldInfo(
         string fieldName,
@@ -46,14 +57,18 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         string typeName,
         bool isNullable,
         ImmutableArray<string> alsoNotify,
-        string? setterAccess = null)
+        ImmutableArray<string> commandsToNotify,
+        string? setterAccess = null,
+        bool isPrimitiveType = false)
     {
         FieldName = fieldName;
         PropertyName = propertyName;
         TypeName = typeName;
         IsNullable = isNullable;
         AlsoNotify = alsoNotify;
+        CommandsToNotify = commandsToNotify;
         SetterAccess = setterAccess;
+        IsPrimitiveType = isPrimitiveType;
     }
 
     public bool Equals(FieldInfo other)
@@ -63,7 +78,9 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             && TypeName == other.TypeName
             && IsNullable == other.IsNullable
             && SetterAccess == other.SetterAccess
-            && AlsoNotify.SequenceEqual(other.AlsoNotify);
+            && IsPrimitiveType == other.IsPrimitiveType
+            && AlsoNotify.SequenceEqual(other.AlsoNotify)
+            && CommandsToNotify.SequenceEqual(other.CommandsToNotify);
     }
 
     public override bool Equals(object? obj)
@@ -81,12 +98,19 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             hash = hash * 31 + (TypeName?.GetHashCode() ?? 0);
             hash = hash * 31 + IsNullable.GetHashCode();
             hash = hash * 31 + (SetterAccess?.GetHashCode() ?? 0);
+            hash = hash * 31 + IsPrimitiveType.GetHashCode();
             hash = hash * 31 + AlsoNotify.Length;
+            hash = hash * 31 + CommandsToNotify.Length;
 
             // Include first element hash for better distribution when arrays differ
             if (AlsoNotify.Length > 0)
             {
                 hash = hash * 31 + (AlsoNotify[0]?.GetHashCode() ?? 0);
+            }
+
+            if (CommandsToNotify.Length > 0)
+            {
+                hash = hash * 31 + (CommandsToNotify[0]?.GetHashCode() ?? 0);
             }
 
             return hash;

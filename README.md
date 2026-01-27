@@ -85,7 +85,7 @@ public partial class Person : INotifyPropertyChanged
         get => _age;
         set
         {
-            if (EqualityComparer<int>.Default.Equals(_age, value)) return;
+            if (_age == value) return;  // Direct comparison for primitives
             OnAgeChanging(_age, value);
             _age = value;
             OnPropertyChanged();
@@ -138,25 +138,31 @@ Here's a more complete ViewModel showing several features working together:
 ```csharp
 using NotifyGen;
 
-[Notify]
+[Notify(ImplementChanging = true)]  // Enable PropertyChanging for undo/redo
+[NotifySuppressable]                 // Enable batch notification suppression
 public partial class CustomerViewModel
 {
     // Basic properties - just declare the field
+    [NotifyAlso("FullName")]
     private string _firstName;
+
+    [NotifyAlso("FullName")]
     private string _lastName;
+
     private string? _email;
 
-    // Notify dependent properties when these change
-    [NotifyAlso("FullName")]
+    // Notify dependent properties and refresh save command
     [NotifyAlso("CanSave")]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     private string _company;
 
     // Private setter - can only be set internally
     [NotifySetter(AccessLevel.Private)]
     private int _id;
 
-    // Custom property name
+    // Custom property name with command notification
     [NotifyName("IsPreferredCustomer")]
+    [NotifyCanExecuteChangedFor(nameof(ApplyDiscountCommand))]
     private bool _preferred;
 
     // Exclude from generation - manage manually
@@ -170,9 +176,27 @@ public partial class CustomerViewModel
     public bool CanSave => !string.IsNullOrWhiteSpace(FirstName)
                         && !string.IsNullOrWhiteSpace(Company);
 
+    // Commands with auto-refreshing CanExecute
+    public IRelayCommand SaveCommand { get; }
+    public IRelayCommand ApplyDiscountCommand { get; }
+
     public CustomerViewModel(ICustomerService customerService)
     {
         _customerService = customerService;
+        SaveCommand = new RelayCommand(Save, () => CanSave);
+        ApplyDiscountCommand = new RelayCommand(ApplyDiscount, () => IsPreferredCustomer);
+    }
+
+    // Bulk update without intermediate notifications
+    public void LoadFromDto(CustomerDto dto)
+    {
+        using (SuppressNotifications())
+        {
+            FirstName = dto.FirstName;
+            LastName = dto.LastName;
+            Email = dto.Email;
+            Company = dto.Company;
+        }  // Single batch of PropertyChanged events fires here
     }
 
     // Hook into property changes for validation
@@ -185,9 +209,12 @@ public partial class CustomerViewModel
     // React to changes
     partial void OnEmailChanged()
     {
-        // Maybe validate email format, update UI state, etc.
         ValidateEmail();
     }
+
+    private void Save() { /* ... */ }
+    private void ApplyDiscount() { /* ... */ }
+    private void ValidateEmail() { /* ... */ }
 }
 ```
 
@@ -223,10 +250,14 @@ The underscore is stripped and the first letter is capitalized.
 Every generated setter checks if the value actually changed before doing anything:
 
 ```csharp
+// For primitive types (int, bool, double, etc.) - direct comparison
+if (_age == value) return;
+
+// For reference types and complex value types - EqualityComparer
 if (EqualityComparer<string>.Default.Equals(_name, value)) return;
 ```
 
-This prevents unnecessary `PropertyChanged` events and infinite loops from two-way bindings. Works correctly with nulls, value types, and reference types.
+NotifyGen automatically detects primitive types and uses direct `==` comparison for maximum performance. This prevents unnecessary `PropertyChanged` events and infinite loops from two-way bindings. Works correctly with nulls, value types, and reference types.
 
 ### Dependent Properties with `[NotifyAlso]`
 
@@ -327,6 +358,144 @@ partial void OnSelectedItemChanged()
 
 If you don't implement these methods, the compiler removes the calls entirely—no performance cost.
 
+### INotifyPropertyChanging with `ImplementChanging`
+
+For undo/redo scenarios, you may need the `PropertyChanging` event that fires *before* the value changes:
+
+```csharp
+[Notify(ImplementChanging = true)]
+public partial class Document
+{
+    private string _content;
+}
+```
+
+This generates:
+
+```csharp
+public partial class Document : INotifyPropertyChanged, INotifyPropertyChanging
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public event PropertyChangingEventHandler? PropertyChanging;
+
+    public string Content
+    {
+        get => _content;
+        set
+        {
+            if (EqualityComparer<string>.Default.Equals(_content, value)) return;
+            OnPropertyChanging();        // Fires BEFORE change
+            OnContentChanging(_content, value);
+            _content = value;
+            OnPropertyChanged();         // Fires AFTER change
+            OnContentChanged();
+        }
+    }
+
+    protected virtual void OnPropertyChanging([CallerMemberName] string? propertyName = null)
+        => PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(propertyName));
+}
+```
+
+If your base class already implements `INotifyPropertyChanging`, NotifyGen detects this and won't duplicate the interface or events.
+
+### Command CanExecute with `[NotifyCanExecuteChangedFor]`
+
+When a property change should refresh a command's `CanExecute` state, use `[NotifyCanExecuteChangedFor]`:
+
+```csharp
+[Notify]
+public partial class EditorViewModel
+{
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    [NotifyCanExecuteChangedFor(nameof(UndoCommand))]
+    private string _content;
+
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private bool _isDirty;
+
+    public IRelayCommand SaveCommand { get; }
+    public IRelayCommand UndoCommand { get; }
+}
+```
+
+This generates calls to `NotifyCanExecuteChanged()` in the setter:
+
+```csharp
+public string Content
+{
+    set
+    {
+        if (EqualityComparer<string>.Default.Equals(_content, value)) return;
+        OnContentChanging(_content, value);
+        _content = value;
+        OnPropertyChanged();
+        SaveCommand?.NotifyCanExecuteChanged();  // Auto-generated
+        UndoCommand?.NotifyCanExecuteChanged();  // Auto-generated
+        OnContentChanged();
+    }
+}
+```
+
+Works with any command type that has a `NotifyCanExecuteChanged()` method (CommunityToolkit.Mvvm `IRelayCommand`, Prism `DelegateCommand`, etc.).
+
+### Batch Notification Suppression with `[NotifySuppressable]`
+
+For bulk updates where you want to defer `PropertyChanged` events until all changes complete:
+
+```csharp
+[Notify]
+[NotifySuppressable]
+public partial class Person
+{
+    private string _firstName;
+    private string _lastName;
+    private string _email;
+}
+
+// Usage:
+using (person.SuppressNotifications())
+{
+    person.FirstName = "John";
+    person.LastName = "Doe";
+    person.Email = "john@example.com";
+}  // All three PropertyChanged events fire here
+```
+
+This generates suppression infrastructure:
+
+```csharp
+public partial class Person : INotifyPropertyChanged
+{
+    private int _notificationSuppressionCount;
+    private HashSet<string>? _pendingNotifications;
+
+    public IDisposable SuppressNotifications()
+    {
+        _notificationSuppressionCount++;
+        return new NotificationSuppressor(this);
+    }
+
+    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        if (_notificationSuppressionCount > 0)
+        {
+            _pendingNotifications ??= new HashSet<string>();
+            _pendingNotifications.Add(propertyName!);
+            return;
+        }
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+    // ... ResumeNotifications and NotificationSuppressor class
+}
+```
+
+**Features:**
+- Nested suppression scopes supported (uses reference counting)
+- Duplicate property names deduplicated (HashSet)
+- Zero allocations when not suppressing
+- Thread-safe within a single scope
+
 ### Working with Existing INotifyPropertyChanged
 
 If your class already implements `INotifyPropertyChanged` (e.g., from a base class), NotifyGen detects this and won't generate a duplicate implementation:
@@ -378,30 +547,30 @@ Comparison against popular INPC libraries on .NET 9.0 (Apple M4):
 
 | Library | Mean | Ratio | Allocated |
 |---------|-----:|------:|----------:|
-| **NotifyGen** | **16.68 ns** | **1.00** | 48 B |
-| CommunityToolkit.Mvvm | 18.46 ns | 1.11 | 48 B |
-| Fody PropertyChanged | 18.44 ns | 1.11 | 48 B |
-| Prism | 25.60 ns | 1.54 | 72 B |
+| **NotifyGen** | **17.57 ns** | **1.00** | 48 B |
+| CommunityToolkit.Mvvm | 18.47 ns | 1.05 | 48 B |
+| Fody PropertyChanged | 18.50 ns | 1.05 | 48 B |
+| Prism | 26.28 ns | 1.50 | 72 B |
 
 #### Property Setters (Int)
 
 | Library | Mean | Ratio | Allocated |
 |---------|-----:|------:|----------:|
-| **NotifyGen** | **0.38 ns** | **1.00** | - |
-| Fody PropertyChanged | 0.48 ns | 1.28 | - |
-| CommunityToolkit.Mvvm | 0.83 ns | 2.21 | - |
-| Prism | 4.77 ns | 12.67 | 24 B |
+| Fody PropertyChanged | 0.46 ns | 0.92 | - |
+| **NotifyGen** | **0.50 ns** | **1.00** | - |
+| CommunityToolkit.Mvvm | 0.91 ns | 1.81 | - |
+| Prism | 5.01 ns | 9.99 | 24 B |
 
 #### Equality Guards (Same Value - No Event)
 
 | Library | Mean | Ratio |
 |---------|-----:|------:|
-| **NotifyGen** | **0.07 ns** | **1.00** |
-| Fody PropertyChanged | 0.46 ns | 6.65 |
-| Prism | 0.49 ns | 6.94 |
-| CommunityToolkit.Mvvm | 0.57 ns | 8.13 |
+| Fody PropertyChanged | 0.48 ns | 0.93 |
+| Prism | 0.50 ns | 0.97 |
+| **NotifyGen** | **0.52 ns** | **1.00** |
+| CommunityToolkit.Mvvm | 0.52 ns | 1.01 |
 
-NotifyGen's generated code is the fastest across all benchmarks—identical to hand-written code.
+NotifyGen is the **fastest for string property setters** and competitive across all benchmarks. Primitive types (int, bool, double, etc.) use direct `==` comparison for optimal performance.
 
 Run benchmarks yourself:
 ```bash
@@ -418,6 +587,9 @@ dotnet run -c Release --project benchmarks/NotifyGen.Benchmarks -- --filter *Com
 | Build impact | Runs during compile | Post-build step | Runs during compile |
 | Equality checks | Always built-in | Configurable | Opt-in with attribute |
 | Partial hooks | `OnXxxChanging` + `OnXxxChanged` | Intercept methods | `OnXxxChanging` only |
+| INotifyPropertyChanging | ✅ `ImplementChanging = true` | ✅ Built-in | ✅ Separate attribute |
+| Command CanExecute refresh | ✅ `[NotifyCanExecuteChangedFor]` | ❌ Manual | ✅ `[NotifyCanExecuteChangedFor]` |
+| Batch notification suppression | ✅ `[NotifySuppressable]` | ❌ Not available | ❌ Not available |
 | Learning curve | One attribute | Multiple attributes + config | Multiple attributes |
 | **Performance** | **Fastest** | Fast | Good |
 
@@ -440,6 +612,8 @@ dotnet run -c Release --project benchmarks/NotifyGen.Benchmarks -- --filter *Com
 
 ```csharp
 [Notify]                              // Enable generation for this class
+[Notify(ImplementChanging = true)]    // Also implement INotifyPropertyChanging
+[NotifySuppressable]                  // Enable batch notification suppression
 public partial class MyViewModel      // Must be partial
 {
     private string _name;             // → public string Name { get; set; }
@@ -456,10 +630,23 @@ public partial class MyViewModel      // Must be partial
     [NotifySetter(AccessLevel.Private)]
     private int _id;                  // → public int Id { get; private set; }
 
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private bool _canSave;            // Calls SaveCommand.NotifyCanExecuteChanged()
+
+    public IRelayCommand SaveCommand { get; }
+
     // Optional hooks - implement only what you need
     partial void OnNameChanging(string oldValue, string newValue);
     partial void OnNameChanged();
 }
+
+// Batch updates (when [NotifySuppressable] is applied):
+using (viewModel.SuppressNotifications())
+{
+    viewModel.Name = "New Name";
+    viewModel.IsActive = true;
+}  // PropertyChanged fires for both here
+```
 ```
 
 ## Troubleshooting
@@ -521,6 +708,9 @@ This sample shows:
 - `[NotifyName]` for custom property names
 - `[NotifySetter]` for access control
 - `[NotifyIgnore]` for excluded fields
+- `[NotifyCanExecuteChangedFor]` for command refresh
+- `[NotifySuppressable]` for batch updates
+- `ImplementChanging = true` for PropertyChanging events
 - Partial hooks for validation and side effects
 - Equality guards preventing duplicate events
 

@@ -35,6 +35,21 @@ internal readonly struct ClassInfo : IEquatable<ClassInfo>
     public bool AlreadyImplementsInpc { get; }
 
     /// <summary>
+    /// Whether the class already implements INotifyPropertyChanging.
+    /// </summary>
+    public bool AlreadyImplementsInpcChanging { get; }
+
+    /// <summary>
+    /// Whether to implement INotifyPropertyChanging (from NotifyAttribute.ImplementChanging).
+    /// </summary>
+    public bool ImplementChanging { get; }
+
+    /// <summary>
+    /// Whether to implement notification suppression (from NotifySuppressableAttribute).
+    /// </summary>
+    public bool IsSuppressable { get; }
+
+    /// <summary>
     /// The fields to generate properties for.
     /// </summary>
     public ImmutableArray<FieldInfo> Fields { get; }
@@ -45,6 +60,9 @@ internal readonly struct ClassInfo : IEquatable<ClassInfo>
         string typeParameters,
         string accessibility,
         bool alreadyImplementsInpc,
+        bool alreadyImplementsInpcChanging,
+        bool implementChanging,
+        bool isSuppressable,
         ImmutableArray<FieldInfo> fields)
     {
         Namespace = @namespace;
@@ -52,6 +70,9 @@ internal readonly struct ClassInfo : IEquatable<ClassInfo>
         TypeParameters = typeParameters;
         Accessibility = accessibility;
         AlreadyImplementsInpc = alreadyImplementsInpc;
+        AlreadyImplementsInpcChanging = alreadyImplementsInpcChanging;
+        ImplementChanging = implementChanging;
+        IsSuppressable = isSuppressable;
         Fields = fields;
     }
 
@@ -62,6 +83,9 @@ internal readonly struct ClassInfo : IEquatable<ClassInfo>
             && TypeParameters == other.TypeParameters
             && Accessibility == other.Accessibility
             && AlreadyImplementsInpc == other.AlreadyImplementsInpc
+            && AlreadyImplementsInpcChanging == other.AlreadyImplementsInpcChanging
+            && ImplementChanging == other.ImplementChanging
+            && IsSuppressable == other.IsSuppressable
             && Fields.SequenceEqual(other.Fields);
     }
 
@@ -80,6 +104,9 @@ internal readonly struct ClassInfo : IEquatable<ClassInfo>
             hash = hash * 31 + (TypeParameters?.GetHashCode() ?? 0);
             hash = hash * 31 + (Accessibility?.GetHashCode() ?? 0);
             hash = hash * 31 + AlreadyImplementsInpc.GetHashCode();
+            hash = hash * 31 + AlreadyImplementsInpcChanging.GetHashCode();
+            hash = hash * 31 + ImplementChanging.GetHashCode();
+            hash = hash * 31 + IsSuppressable.GetHashCode();
             hash = hash * 31 + Fields.Length;
 
             // Include first field's hash for better distribution

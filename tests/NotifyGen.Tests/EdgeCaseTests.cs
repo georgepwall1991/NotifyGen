@@ -199,9 +199,14 @@ public class EdgeCaseTests
 
         var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "ValueTypes.g.cs");
         generatedSource.Should().NotBeNull();
-        generatedSource.Should().Contain("EqualityComparer<int>.Default.Equals");
-        generatedSource.Should().Contain("EqualityComparer<double>.Default.Equals");
-        generatedSource.Should().Contain("EqualityComparer<decimal>.Default.Equals");
+        // Primitive types use direct == for performance
+        generatedSource.Should().Contain("if (_intValue == value) return;");
+        generatedSource.Should().Contain("if (_doubleValue == value) return;");
+        generatedSource.Should().Contain("if (_decimalValue == value) return;");
+        generatedSource.Should().Contain("if (_boolValue == value) return;");
+        // Complex value types (DateTime, Guid) still use EqualityComparer
+        generatedSource.Should().Contain("EqualityComparer<System.DateTime>.Default.Equals");
+        generatedSource.Should().Contain("EqualityComparer<System.Guid>.Default.Equals");
     }
 
     [Fact]
