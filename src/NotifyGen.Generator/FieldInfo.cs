@@ -35,6 +35,11 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
     public ImmutableArray<string> AlsoNotify { get; }
 
     /// <summary>
+    /// Command names to call NotifyCanExecuteChanged() on when this field changes.
+    /// </summary>
+    public ImmutableArray<string> CommandsToNotify { get; }
+
+    /// <summary>
     /// The access modifier for the setter (e.g., "private", "protected").
     /// Null means use the same access as the property (public).
     /// </summary>
@@ -52,6 +57,7 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         string typeName,
         bool isNullable,
         ImmutableArray<string> alsoNotify,
+        ImmutableArray<string> commandsToNotify,
         string? setterAccess = null,
         bool isPrimitiveType = false)
     {
@@ -60,6 +66,7 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         TypeName = typeName;
         IsNullable = isNullable;
         AlsoNotify = alsoNotify;
+        CommandsToNotify = commandsToNotify;
         SetterAccess = setterAccess;
         IsPrimitiveType = isPrimitiveType;
     }
@@ -72,7 +79,8 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             && IsNullable == other.IsNullable
             && SetterAccess == other.SetterAccess
             && IsPrimitiveType == other.IsPrimitiveType
-            && AlsoNotify.SequenceEqual(other.AlsoNotify);
+            && AlsoNotify.SequenceEqual(other.AlsoNotify)
+            && CommandsToNotify.SequenceEqual(other.CommandsToNotify);
     }
 
     public override bool Equals(object? obj)
@@ -92,11 +100,17 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             hash = hash * 31 + (SetterAccess?.GetHashCode() ?? 0);
             hash = hash * 31 + IsPrimitiveType.GetHashCode();
             hash = hash * 31 + AlsoNotify.Length;
+            hash = hash * 31 + CommandsToNotify.Length;
 
             // Include first element hash for better distribution when arrays differ
             if (AlsoNotify.Length > 0)
             {
                 hash = hash * 31 + (AlsoNotify[0]?.GetHashCode() ?? 0);
+            }
+
+            if (CommandsToNotify.Length > 0)
+            {
+                hash = hash * 31 + (CommandsToNotify[0]?.GetHashCode() ?? 0);
             }
 
             return hash;
