@@ -42,4 +42,28 @@ internal static class DiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: "The [NotifyAlso] attribute should reference an existing property name. Check for typos in the property name.");
+
+    /// <summary>
+    /// NOTIFY004: Static or const field cannot be used for property generation.
+    /// </summary>
+    public static readonly DiagnosticDescriptor StaticOrConstField = new(
+        id: "NOTIFY004",
+        title: "Static or const field not supported",
+        messageFormat: "Static field '{0}' cannot be used for property generation. Only instance fields are supported. Remove the static/const modifier or add [NotifyIgnore].",
+        category: "NotifyGen",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "NotifyGen only generates properties for instance fields. Static and const fields cannot trigger PropertyChanged events because they are shared across instances.");
+
+    /// <summary>
+    /// NOTIFY005: Readonly field cannot generate a property with a setter.
+    /// </summary>
+    public static readonly DiagnosticDescriptor ReadonlyField = new(
+        id: "NOTIFY005",
+        title: "Readonly field not supported",
+        messageFormat: "Readonly field '{0}' cannot generate a property with a setter. Remove readonly modifier or add [NotifyIgnore] to suppress this warning.",
+        category: "NotifyGen",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Readonly fields cannot be modified after initialization, so a property setter cannot be generated. Consider making the field mutable or using a computed property instead.");
 }

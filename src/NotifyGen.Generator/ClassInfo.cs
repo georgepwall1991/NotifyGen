@@ -50,6 +50,11 @@ internal readonly struct ClassInfo : IEquatable<ClassInfo>
     public bool IsSuppressable { get; }
 
     /// <summary>
+    /// Property names that should never be suppressed (from NotifySuppressableAttribute.AlwaysNotify).
+    /// </summary>
+    public ImmutableArray<string> AlwaysNotifyProperties { get; }
+
+    /// <summary>
     /// The fields to generate properties for.
     /// </summary>
     public ImmutableArray<FieldInfo> Fields { get; }
@@ -63,6 +68,7 @@ internal readonly struct ClassInfo : IEquatable<ClassInfo>
         bool alreadyImplementsInpcChanging,
         bool implementChanging,
         bool isSuppressable,
+        ImmutableArray<string> alwaysNotifyProperties,
         ImmutableArray<FieldInfo> fields)
     {
         Namespace = @namespace;
@@ -73,6 +79,7 @@ internal readonly struct ClassInfo : IEquatable<ClassInfo>
         AlreadyImplementsInpcChanging = alreadyImplementsInpcChanging;
         ImplementChanging = implementChanging;
         IsSuppressable = isSuppressable;
+        AlwaysNotifyProperties = alwaysNotifyProperties;
         Fields = fields;
     }
 
@@ -86,6 +93,7 @@ internal readonly struct ClassInfo : IEquatable<ClassInfo>
             && AlreadyImplementsInpcChanging == other.AlreadyImplementsInpcChanging
             && ImplementChanging == other.ImplementChanging
             && IsSuppressable == other.IsSuppressable
+            && AlwaysNotifyProperties.SequenceEqual(other.AlwaysNotifyProperties)
             && Fields.SequenceEqual(other.Fields);
     }
 
@@ -107,6 +115,7 @@ internal readonly struct ClassInfo : IEquatable<ClassInfo>
             hash = hash * 31 + AlreadyImplementsInpcChanging.GetHashCode();
             hash = hash * 31 + ImplementChanging.GetHashCode();
             hash = hash * 31 + IsSuppressable.GetHashCode();
+            hash = hash * 31 + AlwaysNotifyProperties.Length;
             hash = hash * 31 + Fields.Length;
 
             // Include first field's hash for better distribution

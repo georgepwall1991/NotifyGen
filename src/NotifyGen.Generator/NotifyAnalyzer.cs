@@ -22,7 +22,9 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         ImmutableArray.Create(
             DiagnosticDescriptors.ClassMustBePartial,
             DiagnosticDescriptors.NoEligibleFields,
-            DiagnosticDescriptors.UnknownNotifyAlsoProperty);
+            DiagnosticDescriptors.UnknownNotifyAlsoProperty,
+            DiagnosticDescriptors.StaticOrConstField,
+            DiagnosticDescriptors.ReadonlyField);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -61,15 +63,71 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        // Check if there are any eligible fields (for partial classes)
-        var hasEligibleFields = classSymbol.GetMembers()
-            .OfType<IFieldSymbol>()
-            .Any(f => f.DeclaredAccessibility == Accessibility.Private
-                && f.Name.StartsWith("_")
-                && f.Name.Length >= 2
-                && !f.GetAttributes().Any(a =>
-                    a.AttributeClass?.ToDisplayString() == "NotifyGen.NotifyIgnoreAttribute"));
+        // Analyze fields for eligibility and report specific issues
+        AnalyzeFieldEligibility(context, classSymbol, classDeclaration);
 
+        // Check NotifyAlso references (NOTIFY003)
+        AnalyzeNotifyAlsoReferences(context, classSymbol);
+    }
+
+    private static void AnalyzeFieldEligibility(
+        SyntaxNodeAnalysisContext context,
+        INamedTypeSymbol classSymbol,
+        ClassDeclarationSyntax classDeclaration)
+    {
+        var allFields = classSymbol.GetMembers().OfType<IFieldSymbol>().ToImmutableArray();
+        var hasEligibleFields = false;
+
+        foreach (var field in allFields)
+        {
+            // Skip fields with [NotifyIgnore]
+            if (field.GetAttributes().Any(a =>
+                a.AttributeClass?.ToDisplayString() == NotifyIgnoreAttributeName))
+                continue;
+
+            // Check if field is eligible
+            var isPrivate = field.DeclaredAccessibility == Accessibility.Private;
+            var hasUnderscore = field.Name.StartsWith("_") && field.Name.Length >= 2;
+            var isInstance = !field.IsStatic && !field.IsConst;
+            var isMutable = !field.IsReadOnly;
+
+            // Report specific issues for fields with underscore prefix
+            if (hasUnderscore && isPrivate)
+            {
+                // Report static/const fields
+                if (!isInstance)
+                {
+                    var fieldSyntax = field.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(context.CancellationToken);
+                    var location = fieldSyntax?.GetLocation() ?? classDeclaration.Identifier.GetLocation();
+
+                    var diagnostic = Diagnostic.Create(
+                        DiagnosticDescriptors.StaticOrConstField,
+                        location,
+                        field.Name);
+                    context.ReportDiagnostic(diagnostic);
+                    continue;
+                }
+
+                // Report readonly fields
+                if (!isMutable)
+                {
+                    var fieldSyntax = field.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(context.CancellationToken);
+                    var location = fieldSyntax?.GetLocation() ?? classDeclaration.Identifier.GetLocation();
+
+                    var diagnostic = Diagnostic.Create(
+                        DiagnosticDescriptors.ReadonlyField,
+                        location,
+                        field.Name);
+                    context.ReportDiagnostic(diagnostic);
+                    continue;
+                }
+
+                // This field is eligible
+                hasEligibleFields = true;
+            }
+        }
+
+        // If no eligible fields, report NOTIFY002
         if (!hasEligibleFields)
         {
             var diagnostic = Diagnostic.Create(
@@ -78,9 +136,6 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                 classSymbol.Name);
             context.ReportDiagnostic(diagnostic);
         }
-
-        // Check NotifyAlso references (NOTIFY003)
-        AnalyzeNotifyAlsoReferences(context, classSymbol);
     }
 
     private static void AnalyzeNotifyAlsoReferences(SyntaxNodeAnalysisContext context, INamedTypeSymbol classSymbol)

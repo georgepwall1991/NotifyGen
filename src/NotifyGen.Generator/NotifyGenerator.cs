@@ -84,9 +84,27 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             .FirstOrDefault(a => a.Key == "ImplementChanging")
             .Value.Value is true;
 
-        // Check for [NotifySuppressable] attribute
-        var isSuppressable = classSymbol.GetAttributes()
-            .Any(a => a.AttributeClass?.ToDisplayString() == NotifySuppressableAttributeName);
+        // Check for [NotifySuppressable] attribute and extract AlwaysNotify property
+        var suppressableAttribute = classSymbol.GetAttributes()
+            .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifySuppressableAttributeName);
+
+        var isSuppressable = suppressableAttribute != null;
+        var alwaysNotifyProperties = ImmutableArray<string>.Empty;
+
+        if (suppressableAttribute != null)
+        {
+            // Extract AlwaysNotify property from the attribute
+            var alwaysNotifyArg = suppressableAttribute.NamedArguments
+                .FirstOrDefault(a => a.Key == "AlwaysNotify");
+
+            if (alwaysNotifyArg.Value.Kind == TypedConstantKind.Array)
+            {
+                alwaysNotifyProperties = alwaysNotifyArg.Value.Values
+                    .Where(v => v.Value is string)
+                    .Select(v => (string)v.Value!)
+                    .ToImmutableArray();
+            }
+        }
 
         // Check if already implements INotifyPropertyChanged
         var inpcInterface = semanticModel.Compilation.GetTypeByMetadataName(
@@ -135,6 +153,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             alreadyImplementsInpcChanging,
             implementChanging,
             isSuppressable,
+            alwaysNotifyProperties,
             fields);
     }
 
@@ -143,84 +162,129 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     /// </summary>
     private static ImmutableArray<FieldInfo> ExtractFields(INamedTypeSymbol classSymbol, CancellationToken ct)
     {
-        var fields = new List<FieldInfo>();
-
-        foreach (var member in classSymbol.GetMembers())
-        {
-            ct.ThrowIfCancellationRequested();
-
-            if (member is not IFieldSymbol fieldSymbol)
-                continue;
-
-            // Only private fields
-            if (fieldSymbol.DeclaredAccessibility != Accessibility.Private)
-                continue;
-
-            // Must start with underscore
-            if (!fieldSymbol.Name.StartsWith("_", StringComparison.Ordinal) || fieldSymbol.Name.Length < 2)
-                continue;
-
-            // Check for [NotifyIgnore]
-            if (fieldSymbol.GetAttributes().Any(a =>
-                a.AttributeClass?.ToDisplayString() == NotifyIgnoreAttributeName))
-                continue;
-
-            // Get property name - either from [NotifyName] or derived from field name (_name -> Name)
-            var notifyNameAttr = fieldSymbol.GetAttributes()
-                .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifyNameAttributeName);
-            var propertyName = notifyNameAttr?.ConstructorArguments.FirstOrDefault().Value as string
-                ?? char.ToUpperInvariant(fieldSymbol.Name[1]) + fieldSymbol.Name.Substring(2);
-
-            // Get type name with nullability (use keyword format: string instead of System.String)
-            var typeName = fieldSymbol.Type.ToDisplayString(TypeDisplayFormat);
-
-            // Check nullability
-            var isNullable = fieldSymbol.Type.NullableAnnotation == NullableAnnotation.Annotated
-                || (fieldSymbol.Type is INamedTypeSymbol namedType
-                    && namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T);
-
-            // Get [NotifyAlso] attributes
-            var alsoNotify = fieldSymbol.GetAttributes()
-                .Where(a => a.AttributeClass?.ToDisplayString() == NotifyAlsoAttributeName)
-                .Select(a => a.ConstructorArguments.FirstOrDefault().Value as string)
-                .Where(s => !string.IsNullOrEmpty(s))
-                .Cast<string>()
-                .ToImmutableArray();
-
-            // Get [NotifyCanExecuteChangedFor] attributes
-            var commandsToNotify = fieldSymbol.GetAttributes()
-                .Where(a => a.AttributeClass?.ToDisplayString() == NotifyCanExecuteChangedForAttributeName)
-                .Select(a => a.ConstructorArguments.FirstOrDefault().Value as string)
-                .Where(s => !string.IsNullOrEmpty(s))
-                .Cast<string>()
-                .ToImmutableArray();
-
-            // Get [NotifySetter] attribute for setter access level
-            var setterAttr = fieldSymbol.GetAttributes()
-                .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifySetterAttributeName);
-            string? setterAccess = null;
-            if (setterAttr != null && setterAttr.ConstructorArguments.Length > 0)
+        return classSymbol.GetMembers()
+            .OfType<IFieldSymbol>()
+            .Where(IsEligibleField)
+            .Select(f =>
             {
-                var accessLevel = (int)setterAttr.ConstructorArguments[0].Value!;
-                setterAccess = accessLevel switch
-                {
-                    0 => null, // Public - same as property, no modifier needed
-                    1 => "protected",
-                    2 => "internal",
-                    3 => "private",
-                    4 => "protected internal",
-                    5 => "private protected",
-                    _ => null
-                };
-            }
+                ct.ThrowIfCancellationRequested();
+                return CreateFieldInfo(f);
+            })
+            .ToImmutableArray();
+    }
 
-            // Check if primitive type for optimized equality
-            var isPrimitiveType = IsPrimitiveValueType(fieldSymbol.Type);
+    /// <summary>
+    /// Determines if a field is eligible for property generation.
+    /// </summary>
+    private static bool IsEligibleField(IFieldSymbol field)
+    {
+        // Only private fields
+        if (field.DeclaredAccessibility != Accessibility.Private)
+            return false;
 
-            fields.Add(new FieldInfo(fieldSymbol.Name, propertyName, typeName, isNullable, alsoNotify, commandsToNotify, setterAccess, isPrimitiveType));
-        }
+        // Must start with underscore and have at least 2 characters
+        if (!field.Name.StartsWith("_", StringComparison.Ordinal) || field.Name.Length < 2)
+            return false;
 
-        return fields.ToImmutableArray();
+        // Check for [NotifyIgnore]
+        if (HasAttribute(field, NotifyIgnoreAttributeName))
+            return false;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Creates a FieldInfo record from a field symbol.
+    /// </summary>
+    private static FieldInfo CreateFieldInfo(IFieldSymbol field)
+    {
+        var propertyName = GetPropertyName(field);
+        var typeName = field.Type.ToDisplayString(TypeDisplayFormat);
+        var isNullable = IsNullableType(field.Type);
+        var alsoNotify = GetAttributeValues(field, NotifyAlsoAttributeName);
+        var commandsToNotify = GetAttributeValues(field, NotifyCanExecuteChangedForAttributeName);
+        var setterAccess = GetSetterAccessLevel(field);
+        var isPrimitiveType = IsPrimitiveValueType(field.Type);
+
+        return new FieldInfo(
+            field.Name,
+            propertyName,
+            typeName,
+            isNullable,
+            alsoNotify,
+            commandsToNotify,
+            setterAccess,
+            isPrimitiveType);
+    }
+
+    /// <summary>
+    /// Checks if a field has a specific attribute.
+    /// </summary>
+    private static bool HasAttribute(IFieldSymbol field, string attributeName)
+    {
+        return field.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == attributeName);
+    }
+
+    /// <summary>
+    /// Gets the property name from [NotifyName] or derives it from the field name.
+    /// </summary>
+    private static string GetPropertyName(IFieldSymbol field)
+    {
+        // Get property name from [NotifyName] or derive from field name (_name -> Name)
+        var notifyNameAttr = field.GetAttributes()
+            .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifyNameAttributeName);
+
+        if (notifyNameAttr?.ConstructorArguments.FirstOrDefault().Value is string customName)
+            return customName;
+
+        return char.ToUpperInvariant(field.Name[1]) + field.Name.Substring(2);
+    }
+
+    /// <summary>
+    /// Checks if a type is nullable.
+    /// </summary>
+    private static bool IsNullableType(ITypeSymbol type)
+    {
+        return type.NullableAnnotation == NullableAnnotation.Annotated
+            || (type is INamedTypeSymbol namedType
+                && namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T);
+    }
+
+    /// <summary>
+    /// Extracts string values from multiple instances of an attribute.
+    /// </summary>
+    private static ImmutableArray<string> GetAttributeValues(IFieldSymbol field, string attributeName)
+    {
+        return field.GetAttributes()
+            .Where(a => a.AttributeClass?.ToDisplayString() == attributeName)
+            .Select(a => a.ConstructorArguments.FirstOrDefault().Value as string)
+            .Where(s => !string.IsNullOrEmpty(s))
+            .Cast<string>()
+            .ToImmutableArray();
+    }
+
+    /// <summary>
+    /// Gets the setter access level from [NotifySetter] attribute.
+    /// </summary>
+    private static string? GetSetterAccessLevel(IFieldSymbol field)
+    {
+        var setterAttr = field.GetAttributes()
+            .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifySetterAttributeName);
+
+        if (setterAttr == null || setterAttr.ConstructorArguments.Length == 0)
+            return null;
+
+        var accessLevel = (int)setterAttr.ConstructorArguments[0].Value!;
+        return accessLevel switch
+        {
+            0 => null, // Public - same as property, no modifier needed
+            1 => "protected",
+            2 => "internal",
+            3 => "private",
+            4 => "protected internal",
+            5 => "private protected",
+            _ => null
+        };
     }
 
     /// <summary>
@@ -309,6 +373,19 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         // Suppression fields (only if IsSuppressable)
         if (classInfo.IsSuppressable)
         {
+            // Generate static HashSet for AlwaysNotify properties
+            if (classInfo.AlwaysNotifyProperties.Length > 0)
+            {
+                sb.AppendLine($"{indent}    private static readonly HashSet<string> _neverSuppressedProperties = new()");
+                sb.AppendLine($"{indent}    {{");
+                foreach (var prop in classInfo.AlwaysNotifyProperties)
+                {
+                    sb.AppendLine($"{indent}        \"{prop}\",");
+                }
+                sb.AppendLine($"{indent}    }};");
+                sb.AppendLine();
+            }
+
             sb.AppendLine($"{indent}    private int _notificationSuppressionCount;");
             sb.AppendLine($"{indent}    private HashSet<string>? _pendingNotifications;");
             sb.AppendLine();
@@ -328,7 +405,15 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             sb.AppendLine($"{indent}    {{");
             if (classInfo.IsSuppressable)
             {
-                sb.AppendLine($"{indent}        if (_notificationSuppressionCount > 0)");
+                if (classInfo.AlwaysNotifyProperties.Length > 0)
+                {
+                    // Check if property should never be suppressed
+                    sb.AppendLine($"{indent}        if (_notificationSuppressionCount > 0 && !_neverSuppressedProperties.Contains(propertyName ?? \"\"))");
+                }
+                else
+                {
+                    sb.AppendLine($"{indent}        if (_notificationSuppressionCount > 0)");
+                }
                 sb.AppendLine($"{indent}        {{");
                 sb.AppendLine($"{indent}            _pendingNotifications ??= new HashSet<string>();");
                 sb.AppendLine($"{indent}            _pendingNotifications.Add(propertyName!);");
