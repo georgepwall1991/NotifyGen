@@ -18,8 +18,8 @@ public class EqualityTests
         var fields = ImmutableArray.Create(
             new FieldInfo("_name", "Name", "string", false, ImmutableArray<string>.Empty, ImmutableArray<string>.Empty, null));
 
-        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, fields);
-        var b = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, fields);
+        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, fields);
+        var b = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, fields);
 
         // Act & Assert
         a.Equals(b).Should().BeTrue();
@@ -31,8 +31,8 @@ public class EqualityTests
     {
         // Arrange
         var fields = ImmutableArray<FieldInfo>.Empty;
-        var a = new ClassInfo("Namespace1", "Person", "", "public", false, false, false, false, fields);
-        var b = new ClassInfo("Namespace2", "Person", "", "public", false, false, false, false, fields);
+        var a = new ClassInfo("Namespace1", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, fields);
+        var b = new ClassInfo("Namespace2", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, fields);
 
         // Act & Assert
         a.Equals(b).Should().BeFalse();
@@ -43,8 +43,8 @@ public class EqualityTests
     {
         // Arrange
         var fields = ImmutableArray<FieldInfo>.Empty;
-        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, fields);
-        var b = new ClassInfo("TestNamespace", "Employee", "", "public", false, false, false, false, fields);
+        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, fields);
+        var b = new ClassInfo("TestNamespace", "Employee", "", "public", false, false, false, false, ImmutableArray<string>.Empty, fields);
 
         // Act & Assert
         a.Equals(b).Should().BeFalse();
@@ -55,8 +55,8 @@ public class EqualityTests
     {
         // Arrange
         var fields = ImmutableArray<FieldInfo>.Empty;
-        var a = new ClassInfo("TestNamespace", "Wrapper", "<T>", "public", false, false, false, false, fields);
-        var b = new ClassInfo("TestNamespace", "Wrapper", "<T, U>", "public", false, false, false, false, fields);
+        var a = new ClassInfo("TestNamespace", "Wrapper", "<T>", "public", false, false, false, false, ImmutableArray<string>.Empty, fields);
+        var b = new ClassInfo("TestNamespace", "Wrapper", "<T, U>", "public", false, false, false, false, ImmutableArray<string>.Empty, fields);
 
         // Act & Assert
         a.Equals(b).Should().BeFalse();
@@ -67,8 +67,8 @@ public class EqualityTests
     {
         // Arrange
         var fields = ImmutableArray<FieldInfo>.Empty;
-        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, fields);
-        var b = new ClassInfo("TestNamespace", "Person", "", "internal", false, false, false, false, fields);
+        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, fields);
+        var b = new ClassInfo("TestNamespace", "Person", "", "internal", false, false, false, false, ImmutableArray<string>.Empty, fields);
 
         // Act & Assert
         a.Equals(b).Should().BeFalse();
@@ -79,8 +79,8 @@ public class EqualityTests
     {
         // Arrange
         var fields = ImmutableArray<FieldInfo>.Empty;
-        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, fields);
-        var b = new ClassInfo("TestNamespace", "Person", "", "public", true, false, false, false, fields);
+        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, fields);
+        var b = new ClassInfo("TestNamespace", "Person", "", "public", true, false, false, false, ImmutableArray<string>.Empty, fields);
 
         // Act & Assert
         a.Equals(b).Should().BeFalse();
@@ -95,8 +95,8 @@ public class EqualityTests
         var fieldsB = ImmutableArray.Create(
             new FieldInfo("_age", "Age", "int", false, ImmutableArray<string>.Empty, ImmutableArray<string>.Empty, null));
 
-        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, fieldsA);
-        var b = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, fieldsB);
+        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, fieldsA);
+        var b = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, fieldsB);
 
         // Act & Assert
         a.Equals(b).Should().BeFalse();
@@ -106,8 +106,8 @@ public class EqualityTests
     public void ClassInfo_Equals_EmptyFields_BothEmpty_ReturnsTrue()
     {
         // Arrange
-        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<FieldInfo>.Empty);
-        var b = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<FieldInfo>.Empty);
+        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, ImmutableArray<FieldInfo>.Empty);
+        var b = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, ImmutableArray<FieldInfo>.Empty);
 
         // Act & Assert
         a.Equals(b).Should().BeTrue();
@@ -117,7 +117,7 @@ public class EqualityTests
     public void ClassInfo_Equals_Object_WithNull_ReturnsFalse()
     {
         // Arrange
-        var classInfo = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<FieldInfo>.Empty);
+        var classInfo = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, ImmutableArray<FieldInfo>.Empty);
 
         // Act & Assert
         classInfo.Equals(null).Should().BeFalse();
@@ -127,7 +127,7 @@ public class EqualityTests
     public void ClassInfo_Equals_Object_WithDifferentType_ReturnsFalse()
     {
         // Arrange
-        var classInfo = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<FieldInfo>.Empty);
+        var classInfo = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, ImmutableArray<FieldInfo>.Empty);
 
         // Act & Assert
         classInfo.Equals("not a ClassInfo").Should().BeFalse();
@@ -137,8 +137,8 @@ public class EqualityTests
     public void ClassInfo_Equals_Object_WithSameClassInfo_ReturnsTrue()
     {
         // Arrange
-        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<FieldInfo>.Empty);
-        object b = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<FieldInfo>.Empty);
+        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, ImmutableArray<FieldInfo>.Empty);
+        object b = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, ImmutableArray<FieldInfo>.Empty);
 
         // Act & Assert
         a.Equals(b).Should().BeTrue();
@@ -151,8 +151,8 @@ public class EqualityTests
         var fields = ImmutableArray.Create(
             new FieldInfo("_name", "Name", "string", false, ImmutableArray<string>.Empty, ImmutableArray<string>.Empty, null));
 
-        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, fields);
-        var b = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, fields);
+        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, fields);
+        var b = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, fields);
 
         // Act & Assert
         a.GetHashCode().Should().Be(b.GetHashCode());
@@ -162,7 +162,7 @@ public class EqualityTests
     public void ClassInfo_GetHashCode_EmptyFields_Succeeds()
     {
         // Arrange
-        var classInfo = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<FieldInfo>.Empty);
+        var classInfo = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, ImmutableArray<FieldInfo>.Empty);
 
         // Act
         var hash = classInfo.GetHashCode();
@@ -180,8 +180,8 @@ public class EqualityTests
         var fields2 = ImmutableArray.Create(
             new FieldInfo("_age", "Age", "int", false, ImmutableArray<string>.Empty, ImmutableArray<string>.Empty, null));
 
-        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, fields1);
-        var b = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, fields2);
+        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, fields1);
+        var b = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, fields2);
 
         // Act & Assert - Different first fields should typically produce different hashes
         a.GetHashCode().Should().NotBe(b.GetHashCode());
@@ -191,9 +191,9 @@ public class EqualityTests
     public void ClassInfo_OperatorEquals_Works()
     {
         // Arrange
-        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<FieldInfo>.Empty);
-        var b = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<FieldInfo>.Empty);
-        var c = new ClassInfo("TestNamespace", "Employee", "", "public", false, false, false, false, ImmutableArray<FieldInfo>.Empty);
+        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, ImmutableArray<FieldInfo>.Empty);
+        var b = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, ImmutableArray<FieldInfo>.Empty);
+        var c = new ClassInfo("TestNamespace", "Employee", "", "public", false, false, false, false, ImmutableArray<string>.Empty, ImmutableArray<FieldInfo>.Empty);
 
         // Act & Assert
         (a == b).Should().BeTrue();
@@ -204,9 +204,9 @@ public class EqualityTests
     public void ClassInfo_OperatorNotEquals_Works()
     {
         // Arrange
-        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<FieldInfo>.Empty);
-        var b = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<FieldInfo>.Empty);
-        var c = new ClassInfo("TestNamespace", "Employee", "", "public", false, false, false, false, ImmutableArray<FieldInfo>.Empty);
+        var a = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, ImmutableArray<FieldInfo>.Empty);
+        var b = new ClassInfo("TestNamespace", "Person", "", "public", false, false, false, false, ImmutableArray<string>.Empty, ImmutableArray<FieldInfo>.Empty);
+        var c = new ClassInfo("TestNamespace", "Employee", "", "public", false, false, false, false, ImmutableArray<string>.Empty, ImmutableArray<FieldInfo>.Empty);
 
         // Act & Assert
         (a != b).Should().BeFalse();

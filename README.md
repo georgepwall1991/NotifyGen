@@ -245,6 +245,56 @@ NotifyGen uses underscore-prefixed private fields:
 
 The underscore is stripped and the first letter is capitalized.
 
+### What Fields Are Eligible?
+
+NotifyGen generates properties **only** for private instance fields with underscore prefix. Here's what works and what doesn't:
+
+**✅ Eligible Fields:**
+```csharp
+private string _name;           // ✓ Instance, private, underscore
+private int _age;               // ✓ All types work (primitives, classes, structs)
+private bool? _isActive;        // ✓ Nullable types supported
+```
+
+**❌ Ineligible Fields:**
+```csharp
+public string _name;            // ✗ Must be private
+string _name;                   // ✗ Must be private (default is private in classes, but be explicit)
+protected string _name;         // ✗ Must be private
+internal string _name;          // ✗ Must be private
+
+static string _name;            // ✗ Static fields cannot trigger instance events
+const string _name = "John";    // ✗ Const fields are immutable
+readonly string _name;          // ✗ Readonly fields cannot have setters
+
+private string name;            // ✗ Missing underscore prefix
+private string _;               // ✗ Too short (need at least 2 characters)
+```
+
+**Diagnostics Help You:**
+
+If you mark a class with `[Notify]` but have no eligible fields, NotifyGen will show:
+```
+NOTIFY002: Class 'MyClass' has no eligible fields for property generation.
+Found 2 ineligible fields:
+  - 'name' (missing underscore prefix, should be '_name')
+  - '_logger' (readonly field cannot generate properties)
+```
+
+**Excluding Fields with [NotifyIgnore]:**
+```csharp
+[Notify]
+public partial class ViewModel
+{
+    private string _name;           // ✓ Generates Name property
+
+    [NotifyIgnore]                  // Explicitly excluded
+    private readonly ILogger _logger;
+}
+```
+
+Use `[NotifyIgnore]` on fields you want to exclude from generation (e.g., services, readonly state).
+
 ### Equality Guards
 
 Every generated setter checks if the value actually changed before doing anything:
@@ -357,6 +407,116 @@ partial void OnSelectedItemChanged()
 ```
 
 If you don't implement these methods, the compiler removes the calls entirely—no performance cost.
+
+### Integration with Validation Frameworks
+
+NotifyGen's partial hooks make it easy to integrate with validation libraries:
+
+#### FluentValidation
+
+```csharp
+using FluentValidation;
+using NotifyGen;
+
+[Notify]
+public partial class CustomerViewModel : INotifyDataErrorInfo
+{
+    private string _name;
+    private string _email;
+    private readonly CustomerValidator _validator = new();
+    private readonly Dictionary<string, List<string>> _errors = new();
+
+    public bool HasErrors => _errors.Any();
+    public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged;
+
+    // Validate after property changes
+    partial void OnNameChanged() => ValidateProperty(nameof(Name));
+    partial void OnEmailChanged() => ValidateProperty(nameof(Email));
+
+    private void ValidateProperty(string propertyName)
+    {
+        var result = _validator.Validate(this);
+        var propertyErrors = result.Errors
+            .Where(e => e.PropertyName == propertyName)
+            .Select(e => e.ErrorMessage)
+            .ToList();
+
+        if (propertyErrors.Any())
+            _errors[propertyName] = propertyErrors;
+        else
+            _errors.Remove(propertyName);
+
+        ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(propertyName));
+    }
+
+    public IEnumerable GetErrors(string? propertyName)
+    {
+        return propertyName != null && _errors.ContainsKey(propertyName)
+            ? _errors[propertyName]
+            : Enumerable.Empty<string>();
+    }
+}
+
+public class CustomerValidator : AbstractValidator<CustomerViewModel>
+{
+    public CustomerValidator()
+    {
+        RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.Email).EmailAddress();
+    }
+}
+```
+
+#### DataAnnotations
+
+```csharp
+using System.ComponentModel.DataAnnotations;
+using NotifyGen;
+
+[Notify]
+public partial class PersonViewModel : INotifyDataErrorInfo
+{
+    [Required]
+    [MaxLength(100)]
+    private string _name;
+
+    [EmailAddress]
+    private string? _email;
+
+    private readonly Dictionary<string, List<string>> _errors = new();
+
+    public bool HasErrors => _errors.Any();
+    public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged;
+
+    // Validate after each property change
+    partial void OnNameChanged() => ValidateProperty(nameof(Name), Name);
+    partial void OnEmailChanged() => ValidateProperty(nameof(Email), Email);
+
+    private void ValidateProperty(string propertyName, object? value)
+    {
+        var results = new List<ValidationResult>();
+        var context = new ValidationContext(this) { MemberName = propertyName };
+
+        Validator.TryValidateProperty(value, context, results);
+
+        if (results.Any())
+            _errors[propertyName] = results.Select(r => r.ErrorMessage!).ToList();
+        else
+            _errors.Remove(propertyName);
+
+        ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(propertyName));
+    }
+
+    public IEnumerable GetErrors(string? propertyName)
+    {
+        return propertyName != null && _errors.ContainsKey(propertyName)
+            ? _errors[propertyName]
+            : Enumerable.Empty<string>();
+    }
+}
+```
+
+**Note:** NotifyGen focuses on `INotifyPropertyChanged` generation. For validation errors (`INotifyDataErrorInfo`), implement that interface manually and trigger validation in partial hooks as shown above.
 
 ### INotifyPropertyChanging with `ImplementChanging`
 
@@ -495,6 +655,60 @@ public partial class Person : INotifyPropertyChanged
 - Duplicate property names deduplicated (HashSet)
 - Zero allocations when not suppressing
 - Thread-safe within a single scope
+
+#### Selective Suppression with `AlwaysNotify`
+
+Some properties should always notify immediately, even during suppression (e.g., loading indicators, error flags):
+
+```csharp
+[Notify]
+[NotifySuppressable(AlwaysNotify = new[] { nameof(IsLoading), nameof(HasErrors) })]
+public partial class ViewModel
+{
+    private string _name;
+    private int _age;
+    private bool _isLoading;     // Always fires immediately
+    private bool _hasErrors;     // Always fires immediately
+}
+
+// Usage:
+using (vm.SuppressNotifications())
+{
+    vm.Name = "John";            // Deferred
+    vm.Age = 30;                 // Deferred
+    vm.IsLoading = true;         // ✓ Fires immediately (AlwaysNotify)
+    vm.HasErrors = false;        // ✓ Fires immediately (AlwaysNotify)
+}  // Name and Age notifications fire here
+```
+
+**Use cases:**
+- **Loading indicators** - UI should show spinners immediately, even during bulk updates
+- **Error flags** - Critical state that must notify immediately
+- **Validation status** - UX requires immediate feedback
+- **Progress tracking** - Progress bars should update in real-time
+
+**Implementation:**
+```csharp
+private static readonly HashSet<string> _neverSuppressedProperties = new()
+{
+    "IsLoading",
+    "HasErrors"
+};
+
+protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+{
+    // Check if property should never be suppressed
+    if (_notificationSuppressionCount > 0 && !_neverSuppressedProperties.Contains(propertyName ?? ""))
+    {
+        _pendingNotifications ??= new HashSet<string>();
+        _pendingNotifications.Add(propertyName!);
+        return;
+    }
+    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+}
+```
+
+**Performance:** Adds a static `HashSet<string>` lookup (~O(1)) per `OnPropertyChanged` call when suppression is active. Negligible cost for typical use cases.
 
 ### Working with Existing INotifyPropertyChanged
 
@@ -674,21 +888,58 @@ public partial class MyClass { }
 ```
 
 **NOTIFY002: No eligible fields?**
+
+Check the diagnostic message - it will tell you exactly why fields were rejected:
+```
+NOTIFY002: Class 'MyClass' has no eligible fields for property generation.
+Found 3 ineligible fields:
+  - 'name' (missing underscore prefix, should be '_name')
+  - '_logger' (readonly field cannot generate properties)
+  - '_shared' (static field cannot generate properties)
+```
+
+Common fixes:
 ```csharp
 // Wrong - no underscore prefix
-[Notify]
-public partial class MyClass
-{
-    private string name;
-}
+private string name;           // Fix: private string _name;
 
-// Right
-[Notify]
-public partial class MyClass
-{
-    private string _name;
-}
+// Wrong - readonly field
+private readonly string _logger;   // Fix: Remove readonly or add [NotifyIgnore]
+
+// Wrong - static field
+private static string _shared;     // Fix: Remove static (static fields can't notify)
+
+// Right - eligible fields
+private string _name;
+private int _age;
+private bool? _isActive;
 ```
+
+**NOTIFY004/NOTIFY005: Static or readonly fields?**
+
+These are informational warnings. If you see them:
+- Remove `static`, `const`, or `readonly` modifier if you want property generation
+- Add `[NotifyIgnore]` to suppress the warning if the field should not generate a property
+
+**How to debug generated code?**
+1. Build the project successfully
+2. In Solution Explorer: Expand **Dependencies → Analyzers → NotifyGen → NotifyGen.Generator → NotifyGenerator**
+3. You'll see `YourClass.g.cs` files - this is the generated code
+4. Open them to see exactly what was generated
+5. Set breakpoints in generated code during debugging
+
+**Migration from other naming conventions?**
+
+If you have existing fields with different prefixes (e.g., `m_name`, `mName`), use `[NotifyName]`:
+```csharp
+[NotifyName("Name")]
+private string m_name;  // Generates Name property
+
+[NotifyName("CustomerID")]
+private int mCustomerId;  // Generates CustomerID property
+```
+
+**Note:** This is for migration scenarios. New code should follow the underscore convention.
 
 ## Samples
 
