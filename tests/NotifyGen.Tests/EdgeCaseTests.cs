@@ -660,6 +660,27 @@ public class EdgeCaseTests
                     private string _name = "";
                 }
             }
+
+            namespace C
+            {
+                public partial class OuterA
+                {
+                    [Notify]
+                    public partial class Model
+                    {
+                        private string _name = "";
+                    }
+                }
+
+                public partial struct OuterB
+                {
+                    [Notify]
+                    public partial class Model
+                    {
+                        private string _name = "";
+                    }
+                }
+            }
             """;
 
         var (outputCompilation, _, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(
@@ -667,7 +688,7 @@ public class EdgeCaseTests
         );
         var generatedSources = runResult.Results.Single().GeneratedSources;
 
-        generatedSources.Should().HaveCount(2);
+        generatedSources.Should().HaveCount(4);
         generatedSources.Select(static result => result.HintName).Should().OnlyHaveUniqueItems();
         outputCompilation
             .GetTypeByMetadataName("A.Model")!
@@ -679,6 +700,16 @@ public class EdgeCaseTests
             .GetMembers("Name")
             .Should()
             .ContainSingle();
+        outputCompilation
+            .GetTypeByMetadataName("C.OuterA+Model")!
+            .GetMembers("Name")
+            .Should()
+            .ContainSingle();
+        outputCompilation
+            .GetTypeByMetadataName("C.OuterB+Model")!
+            .GetMembers("Name")
+            .Should()
+            .ContainSingle();
     }
 
     [Theory]
@@ -687,6 +718,12 @@ public class EdgeCaseTests
     [InlineData("public partial record class Container")]
     [InlineData("public partial record struct Container")]
     [InlineData("public partial interface Container")]
+    [InlineData("internal partial class Container")]
+    [InlineData("public static partial class Container")]
+    [InlineData("public abstract partial class Container")]
+    [InlineData("public sealed partial class Container")]
+    [InlineData("public readonly partial struct Container")]
+    [InlineData("public ref partial struct Container")]
     public void Generator_WithSupportedContainingType_GeneratesOnNestedType(
         string containerDeclaration
     )
