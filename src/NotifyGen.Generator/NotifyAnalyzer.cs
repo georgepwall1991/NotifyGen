@@ -68,29 +68,33 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        var nonPartialContainingDeclaration = classDeclaration
-            .Ancestors()
-            .OfType<TypeDeclarationSyntax>()
-            .FirstOrDefault(static declaration =>
-                !declaration.Modifiers.Any(SyntaxKind.PartialKeyword)
-            );
-        if (nonPartialContainingDeclaration != null)
+        var hasNonPartialContainingType = false;
+        foreach (
+            var containingDeclaration in classDeclaration
+                .Ancestors()
+                .OfType<TypeDeclarationSyntax>()
+        )
         {
+            if (containingDeclaration.Modifiers.Any(SyntaxKind.PartialKeyword))
+                continue;
+
             var containingTypeSymbol = context.SemanticModel.GetDeclaredSymbol(
-                nonPartialContainingDeclaration,
+                containingDeclaration,
                 context.CancellationToken
             );
             context.ReportDiagnostic(
                 Diagnostic.Create(
                     DiagnosticDescriptors.ContainingTypeMustBePartial,
-                    nonPartialContainingDeclaration.Identifier.GetLocation(),
-                    containingTypeSymbol?.Name
-                        ?? nonPartialContainingDeclaration.Identifier.ValueText,
+                    containingDeclaration.Identifier.GetLocation(),
+                    containingTypeSymbol?.Name ?? containingDeclaration.Identifier.ValueText,
                     classSymbol.Name
                 )
             );
-            return;
+            hasNonPartialContainingType = true;
         }
+
+        if (hasNonPartialContainingType)
+            return;
 
         // Analyze fields for eligibility and report specific issues
         AnalyzeFieldEligibility(context, classSymbol, classDeclaration);

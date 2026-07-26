@@ -35,6 +35,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
         miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes
             | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier
+            | SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers
     );
 
     public void Initialize(IncrementalGeneratorInitializationContext context)

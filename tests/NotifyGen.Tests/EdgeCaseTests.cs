@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.CodeAnalysis;
+using NotifyGen.Generator;
 
 namespace NotifyGen.Tests;
 
@@ -787,5 +788,76 @@ public class EdgeCaseTests
             .ContainSingle();
         generatedSource.Should().Contain("public static partial class Outer<T>");
         generatedSource.Should().Contain("public partial class Inner<TValue>");
+    }
+
+    [Fact]
+    public void Generator_WithEscapedIdentifiers_PreservesSourceSyntax()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                public partial interface @interface<@class>
+                {
+                    [Notify]
+                    public partial class Inner<@struct> where @struct : struct
+                    {
+                        private @struct _value;
+                    }
+                }
+            }
+            """;
+
+        var (_, _, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
+        var generatedSource = runResult
+            .Results.Single()
+            .GeneratedSources.Single()
+            .SourceText.ToString();
+
+        generatedSource.Should().Contain("public partial interface @interface<@class>");
+        generatedSource.Should().Contain("public partial class Inner<@struct>");
+    }
+
+    [Fact]
+    public void Generator_SourceHints_AreUniqueUnderOrdinalIgnoreCaseComparison()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace AAG
+            {
+                [Notify]
+                public partial class A
+                {
+                    private int _value;
+                }
+            }
+
+            namespace AAa
+            {
+                [Notify]
+                public partial class A
+                {
+                    private int _value;
+                }
+            }
+            """;
+
+        var (_, _, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
+        var hintNames = runResult
+            .Results.Single()
+            .GeneratedSources.Select(static sourceResult => sourceResult.HintName);
+
+        hintNames.Distinct(StringComparer.OrdinalIgnoreCase).Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void SourceHintName_WithLongIdentity_BoundsEveryPathSegment()
+    {
+        var hintName = SourceHintName.Create(new string('N', 300) + ".Model", new string('T', 300));
+
+        hintName.Split('/').Should().OnlyContain(static segment => segment.Length <= 100);
+        hintName.Should().EndWith("/Type.g.cs");
     }
 }

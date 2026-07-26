@@ -37,9 +37,7 @@ internal static class TypeDeclarationInfoFactory
             }
 
             var typeParameters = declaration.TypeParameterList is { } typeParameterList
-                ? typeParameterList
-                    .Parameters.Select(static parameter => parameter.Identifier.ValueText)
-                    .ToImmutableArray()
+                ? typeParameterList.Parameters.Select(GetTypeParameterSource).ToImmutableArray()
                 : ImmutableArray<string>.Empty;
             var requiredModifiers = declaration
                 .Modifiers.Where(IsRequiredModifier)
@@ -54,7 +52,7 @@ internal static class TypeDeclarationInfoFactory
             builder.Add(
                 new TypeDeclarationInfo(
                     GetKind(declaration),
-                    symbol.Name,
+                    declaration.Identifier.Text,
                     symbol.MetadataName,
                     GetAccessibility(symbol.DeclaredAccessibility),
                     requiredModifiers,
@@ -84,6 +82,14 @@ internal static class TypeDeclarationInfoFactory
                 $"Unsupported containing type syntax: {declaration.Kind()}"
             ),
         };
+
+    private static string GetTypeParameterSource(TypeParameterSyntax parameter)
+    {
+        var variance = parameter.VarianceKeyword.IsKind(SyntaxKind.None)
+            ? string.Empty
+            : parameter.VarianceKeyword.Text + " ";
+        return variance + parameter.Identifier.Text;
+    }
 
     private static bool IsRequiredModifier(SyntaxToken token) =>
         token.IsKind(SyntaxKind.StaticKeyword)

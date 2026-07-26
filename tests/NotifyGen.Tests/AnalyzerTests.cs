@@ -383,7 +383,7 @@ public class AnalyzerTests
     }
 
     [Fact]
-    public async Task Analyzer_MultipleNonPartialContainingTypes_ReportsNearestOnly()
+    public async Task Analyzer_MultipleNonPartialContainingTypes_ReportsEveryBlocker()
     {
         var source = """
             using NotifyGen;
@@ -406,10 +406,16 @@ public class AnalyzerTests
 
         var diagnostics = await GetDiagnosticsAsync(source);
 
-        var diagnostic = diagnostics.Should().ContainSingle().Subject;
-        diagnostic.Id.Should().Be("NOTIFY006");
-        diagnostic.GetMessage().Should().Contain("Middle").And.NotContain("Outer");
-        SourceText.From(source).ToString(diagnostic.Location.SourceSpan).Should().Be("Middle");
+        diagnostics.Should().HaveCount(2);
+        diagnostics.Should().OnlyContain(static diagnostic => diagnostic.Id == "NOTIFY006");
+        diagnostics
+            .Select(diagnostic => SourceText.From(source).ToString(diagnostic.Location.SourceSpan))
+            .Should()
+            .BeEquivalentTo("Middle", "Outer");
+        diagnostics
+            .Select(static diagnostic => diagnostic.GetMessage())
+            .Should()
+            .OnlyContain(static message => message.Contains("Inner"));
     }
 
     [Fact]
