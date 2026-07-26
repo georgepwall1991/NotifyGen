@@ -1,7 +1,7 @@
 # Generator Correctness Design
 
 **Date:** 2026-07-26  
-**Status:** Approved for specification  
+**Status:** Approved design  
 **Scope:** NotifyGen source generation and its analyzer/code-fix contract
 
 ## Problem
@@ -131,9 +131,9 @@ Extend the existing make-partial code-fix path to support `NOTIFY006`; do not ad
 
 ### Modeling Failures
 
-A legal supported declaration graph either produces a complete model or reports a generator diagnostic and emits no source. The generator does not emit a malformed fallback or silently flatten the target.
+A legal supported declaration graph is a total modeling case and must produce a complete model. Known source-shape failures (`NOTIFY001` and `NOTIFY006`) are detected by the analyzer; the generator consumes the same validity result, emits nothing for the invalid target, and does not report duplicate diagnostics.
 
-Diagnostics must not duplicate analyzer and generator reports for the same condition. The analyzer owns user-actionable source-shape diagnostics; the generator defensively skips invalid targets.
+Incomplete or error symbols from an already-invalid compilation are skipped without malformed fallback output. Unexpected implementation exceptions are not swallowed. This keeps user-actionable diagnostics authoritative while ensuring valid nested targets cannot be silently flattened.
 
 ## Testing Strategy
 
