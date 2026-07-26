@@ -107,32 +107,30 @@ public class EdgeCaseTests
     [Fact]
     public void Generator_WithNestedClass_GeneratesCorrectly()
     {
-        // Arrange
         var source = """
             using NotifyGen;
 
             namespace TestNamespace
             {
-                public class Outer
+                public partial class Outer
                 {
                     [Notify]
                     public partial class Inner
                     {
-                        private string _value;
+                        private string _value = "";
                     }
                 }
             }
             """;
 
-        // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (outputCompilation, _, _) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
-        // Assert
-        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
-
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "Inner.g.cs");
-        generatedSource.Should().NotBeNull();
-        generatedSource.Should().Contain("public partial class Inner : INotifyPropertyChanged");
+        outputCompilation
+            .GetTypeByMetadataName("TestNamespace.Outer+Inner")!
+            .GetMembers("Value")
+            .Should()
+            .ContainSingle();
+        outputCompilation.GetTypeByMetadataName("TestNamespace.Inner").Should().BeNull();
     }
 
     [Fact]
@@ -607,22 +605,21 @@ public class EdgeCaseTests
     [Fact]
     public void Generator_WithDeeplyNestedClass_GeneratesCorrectly()
     {
-        // Arrange
         var source = """
             using NotifyGen;
 
             namespace TestNamespace
             {
-                public class Level1
+                public partial class Level1
                 {
-                    public class Level2
+                    public partial class Level2
                     {
-                        public class Level3
+                        public partial class Level3
                         {
                             [Notify]
                             public partial class DeepNested
                             {
-                                private string _value;
+                                private string _value = "";
                             }
                         }
                     }
@@ -630,17 +627,128 @@ public class EdgeCaseTests
             }
             """;
 
-        // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (outputCompilation, _, _) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
-        // Assert
-        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
-
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "DeepNested.g.cs");
-        generatedSource.Should().NotBeNull();
-        generatedSource
+        outputCompilation
+            .GetTypeByMetadataName("TestNamespace.Level1+Level2+Level3+DeepNested")!
+            .GetMembers("Value")
             .Should()
-            .Contain("public partial class DeepNested : INotifyPropertyChanged");
-        generatedSource.Should().Contain("public string Value");
+            .ContainSingle();
+        outputCompilation.GetTypeByMetadataName("TestNamespace.DeepNested").Should().BeNull();
+    }
+
+    [Fact]
+    public void Generator_WithSameSimpleName_UsesUniqueSourceHints()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace A
+            {
+                [Notify]
+                public partial class Model
+                {
+                    private string _name = "";
+                }
+            }
+
+            namespace B
+            {
+                [Notify]
+                public partial class Model
+                {
+                    private string _name = "";
+                }
+            }
+            """;
+
+        var (outputCompilation, _, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(
+            source
+        );
+        var generatedSources = runResult.Results.Single().GeneratedSources;
+
+        generatedSources.Should().HaveCount(2);
+        generatedSources.Select(static result => result.HintName).Should().OnlyHaveUniqueItems();
+        outputCompilation
+            .GetTypeByMetadataName("A.Model")!
+            .GetMembers("Name")
+            .Should()
+            .ContainSingle();
+        outputCompilation
+            .GetTypeByMetadataName("B.Model")!
+            .GetMembers("Name")
+            .Should()
+            .ContainSingle();
+    }
+
+    [Theory]
+    [InlineData("public partial class Container")]
+    [InlineData("public partial struct Container")]
+    [InlineData("public partial record class Container")]
+    [InlineData("public partial record struct Container")]
+    [InlineData("public partial interface Container")]
+    public void Generator_WithSupportedContainingType_GeneratesOnNestedType(
+        string containerDeclaration
+    )
+    {
+        var source = $$"""
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                {{containerDeclaration}}
+                {
+                    [Notify]
+                    public partial class Inner
+                    {
+                        private int _value;
+                    }
+                }
+            }
+            """;
+
+        var (outputCompilation, _, _) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
+
+        outputCompilation
+            .GetTypeByMetadataName("TestNamespace.Container+Inner")!
+            .GetMembers("Value")
+            .Should()
+            .ContainSingle();
+    }
+
+    [Fact]
+    public void Generator_WithGenericContainingType_PreservesDeclarationShape()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                public static partial class Outer<T> where T : class, new()
+                {
+                    [Notify]
+                    public partial class Inner<TValue> where TValue : struct
+                    {
+                        private TValue _value;
+                    }
+                }
+            }
+            """;
+
+        var (outputCompilation, _, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(
+            source
+        );
+        var generatedSource = runResult
+            .Results.Single()
+            .GeneratedSources.Single()
+            .SourceText.ToString();
+
+        outputCompilation
+            .GetTypeByMetadataName("TestNamespace.Outer`1+Inner`1")!
+            .GetMembers("Value")
+            .Should()
+            .ContainSingle();
+        generatedSource.Should().Contain("public static partial class Outer<T>");
+        generatedSource.Should().Contain("public partial class Inner<TValue>");
     }
 }

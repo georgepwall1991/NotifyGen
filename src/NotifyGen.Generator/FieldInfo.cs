@@ -59,7 +59,8 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         ImmutableArray<string> alsoNotify,
         ImmutableArray<string> commandsToNotify,
         string? setterAccess = null,
-        bool isPrimitiveType = false)
+        bool isPrimitiveType = false
+    )
     {
         FieldName = fieldName;
         PropertyName = propertyName;
@@ -99,24 +100,16 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             hash = hash * 31 + IsNullable.GetHashCode();
             hash = hash * 31 + (SetterAccess?.GetHashCode() ?? 0);
             hash = hash * 31 + IsPrimitiveType.GetHashCode();
-            hash = hash * 31 + AlsoNotify.Length;
-            hash = hash * 31 + CommandsToNotify.Length;
-
-            // Include first element hash for better distribution when arrays differ
-            if (AlsoNotify.Length > 0)
-            {
-                hash = hash * 31 + (AlsoNotify[0]?.GetHashCode() ?? 0);
-            }
-
-            if (CommandsToNotify.Length > 0)
-            {
-                hash = hash * 31 + (CommandsToNotify[0]?.GetHashCode() ?? 0);
-            }
+            foreach (var propertyName in AlsoNotify)
+                hash = hash * 31 + (propertyName?.GetHashCode() ?? 0);
+            foreach (var commandName in CommandsToNotify)
+                hash = hash * 31 + (commandName?.GetHashCode() ?? 0);
 
             return hash;
         }
     }
 
     public static bool operator ==(FieldInfo left, FieldInfo right) => left.Equals(right);
+
     public static bool operator !=(FieldInfo left, FieldInfo right) => !left.Equals(right);
 }

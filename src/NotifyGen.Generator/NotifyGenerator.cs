@@ -65,47 +65,54 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     /// <summary>
     /// Extracts class information from the semantic model.
     /// </summary>
-    private static ClassInfo? GetClassInfo(GeneratorSyntaxContext context, CancellationToken ct)
+    private static NotificationTypeInfo? GetClassInfo(
+        GeneratorSyntaxContext context,
+        CancellationToken ct
+    )
     {
-        var classDecl = (ClassDeclarationSyntax)context.Node;
+        var classDeclaration = (ClassDeclarationSyntax)context.Node;
         var semanticModel = context.SemanticModel;
 
-        // Get the class symbol
-        if (semanticModel.GetDeclaredSymbol(classDecl, ct) is not INamedTypeSymbol classSymbol)
+        if (
+            semanticModel.GetDeclaredSymbol(classDeclaration, ct)
+            is not INamedTypeSymbol classSymbol
+        )
             return null;
 
-        // Check if it has [Notify] attribute
         var notifyAttribute = classSymbol
             .GetAttributes()
             .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifyAttributeName);
-
         if (notifyAttribute == null)
             return null;
 
-        // Check for ImplementChanging property on the attribute
+        if (
+            !TypeDeclarationInfoFactory.TryCreateChain(
+                semanticModel,
+                classDeclaration,
+                ct,
+                out var typeDeclarations
+            )
+        )
+            return null;
+
         var implementChanging =
             notifyAttribute
                 .NamedArguments.FirstOrDefault(a => a.Key == "ImplementChanging")
                 .Value.Value
             is true;
 
-        // Check for [NotifySuppressable] attribute and extract AlwaysNotify property
         var suppressableAttribute = classSymbol
             .GetAttributes()
             .FirstOrDefault(a =>
                 a.AttributeClass?.ToDisplayString() == NotifySuppressableAttributeName
             );
-
         var isSuppressable = suppressableAttribute != null;
         var alwaysNotifyProperties = ImmutableArray<string>.Empty;
-
         if (suppressableAttribute != null)
         {
-            // Extract AlwaysNotify property from the attribute
             var alwaysNotifyArg = suppressableAttribute.NamedArguments.FirstOrDefault(a =>
                 a.Key == "AlwaysNotify"
             );
-
             if (alwaysNotifyArg.Value.Kind == TypedConstantKind.Array)
             {
                 alwaysNotifyProperties = alwaysNotifyArg
@@ -115,7 +122,6 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             }
         }
 
-        // Check if already implements INotifyPropertyChanged
         var inpcInterface = semanticModel.Compilation.GetTypeByMetadataName(
             "System.ComponentModel.INotifyPropertyChanged"
         );
@@ -123,7 +129,6 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             inpcInterface != null
             && classSymbol.AllInterfaces.Contains(inpcInterface, SymbolEqualityComparer.Default);
 
-        // Check if already implements INotifyPropertyChanging
         var inpcChangingInterface = semanticModel.Compilation.GetTypeByMetadataName(
             "System.ComponentModel.INotifyPropertyChanging"
         );
@@ -134,43 +139,20 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 SymbolEqualityComparer.Default
             );
 
-        // Extract field information
-        var fields = ExtractFields(classSymbol, ct);
+        var containingNamespace = classSymbol.ContainingNamespace;
+        var namespaceName = containingNamespace.IsGlobalNamespace
+            ? string.Empty
+            : containingNamespace.ToDisplayString();
 
-        // Get accessibility
-        var accessibility = classSymbol.DeclaredAccessibility switch
-        {
-            Accessibility.Public => "public",
-            Accessibility.Internal => "internal",
-            Accessibility.Protected => "protected",
-            Accessibility.Private => "private",
-            Accessibility.ProtectedOrInternal => "protected internal",
-            Accessibility.ProtectedAndInternal => "private protected",
-            _ => "internal",
-        };
-
-        // Get namespace (check for global namespace)
-        var ns = classSymbol.ContainingNamespace;
-        var namespaceName =
-            ns != null && !ns.IsGlobalNamespace ? ns.ToDisplayString() : string.Empty;
-
-        // Get type parameters for generic classes
-        var typeParameters =
-            classSymbol.TypeParameters.Length > 0
-                ? "<" + string.Join(", ", classSymbol.TypeParameters.Select(tp => tp.Name)) + ">"
-                : string.Empty;
-
-        return new ClassInfo(
+        return new NotificationTypeInfo(
             namespaceName,
-            classSymbol.Name,
-            typeParameters,
-            accessibility,
+            typeDeclarations,
             alreadyImplementsInpc,
             alreadyImplementsInpcChanging,
             implementChanging,
             isSuppressable,
             alwaysNotifyProperties,
-            fields
+            ExtractFields(classSymbol, ct)
         );
     }
 
@@ -328,9 +310,12 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     /// <summary>
     /// Generates the source code for a class.
     /// </summary>
-    private static void GenerateSource(SourceProductionContext context, ClassInfo classInfo)
+    private static void GenerateSource(
+        SourceProductionContext context,
+        NotificationTypeInfo classInfo
+    )
     {
-        if (classInfo.Fields.Length == 0)
+        if (!classInfo.CanGenerate)
             return;
 
         var sb = new StringBuilder();
@@ -352,18 +337,33 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         }
 
         var indent = hasNamespace ? "    " : "";
+        for (var index = 0; index < classInfo.TypeDeclarations.Length; index++)
+        {
+            var declaration = classInfo.TypeDeclarations[index];
+            var requiredModifiers =
+                declaration.RequiredModifiers.Length == 0
+                    ? string.Empty
+                    : string.Join(" ", declaration.RequiredModifiers) + " ";
+            var interfaces = string.Empty;
+            if (index == classInfo.TypeDeclarations.Length - 1)
+            {
+                var interfaceList = new List<string>();
+                if (!classInfo.AlreadyImplementsInpc)
+                    interfaceList.Add("INotifyPropertyChanged");
+                if (classInfo.ImplementChanging && !classInfo.AlreadyImplementsInpcChanging)
+                    interfaceList.Add("INotifyPropertyChanging");
+                interfaces =
+                    interfaceList.Count == 0
+                        ? string.Empty
+                        : " : " + string.Join(", ", interfaceList);
+            }
 
-        // Class declaration with interface(s)
-        var interfaceList = new List<string>();
-        if (!classInfo.AlreadyImplementsInpc)
-            interfaceList.Add("INotifyPropertyChanged");
-        if (classInfo.ImplementChanging && !classInfo.AlreadyImplementsInpcChanging)
-            interfaceList.Add("INotifyPropertyChanging");
-        var interfaces = interfaceList.Count > 0 ? " : " + string.Join(", ", interfaceList) : "";
-        sb.AppendLine(
-            $"{indent}{classInfo.Accessibility} partial class {classInfo.ClassName}{classInfo.TypeParameters}{interfaces}"
-        );
-        sb.AppendLine($"{indent}{{");
+            sb.AppendLine(
+                $"{indent}{declaration.Accessibility} {requiredModifiers}partial {declaration.Keyword} {declaration.Name}{declaration.TypeParameterList}{interfaces}"
+            );
+            sb.AppendLine($"{indent}{{");
+            indent += "    ";
+        }
 
         // PropertyChanged event (only if not already implemented)
         if (!classInfo.AlreadyImplementsInpc)
@@ -508,10 +508,10 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             sb.AppendLine($"{indent}    private sealed class NotificationSuppressor : IDisposable");
             sb.AppendLine($"{indent}    {{");
             sb.AppendLine(
-                $"{indent}        private readonly {classInfo.ClassName}{classInfo.TypeParameters} _owner;"
+                $"{indent}        private readonly {classInfo.TargetType.Name}{classInfo.TargetType.TypeParameterList} _owner;"
             );
             sb.AppendLine(
-                $"{indent}        public NotificationSuppressor({classInfo.ClassName}{classInfo.TypeParameters} owner) => _owner = owner;"
+                $"{indent}        public NotificationSuppressor({classInfo.TargetType.Name}{classInfo.TargetType.TypeParameterList} owner) => _owner = owner;"
             );
             sb.AppendLine(
                 $"{indent}        public void Dispose() => _owner.ResumeNotifications();"
@@ -519,7 +519,11 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             sb.AppendLine($"{indent}    }}");
         }
 
-        sb.AppendLine($"{indent}}}");
+        for (var index = classInfo.TypeDeclarations.Length - 1; index >= 0; index--)
+        {
+            indent = indent.Substring(0, indent.Length - 4);
+            sb.AppendLine($"{indent}}}");
+        }
 
         if (hasNamespace)
         {
@@ -527,7 +531,10 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         }
 
         var sourceText = SourceText.From(sb.ToString(), Encoding.UTF8);
-        context.AddSource($"{classInfo.ClassName}.g.cs", sourceText);
+        context.AddSource(
+            SourceHintName.Create(classInfo.TargetType.MetadataIdentity, classInfo.TargetType.Name),
+            sourceText
+        );
     }
 
     /// <summary>
