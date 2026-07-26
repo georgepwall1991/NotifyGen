@@ -191,6 +191,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         var commandsToNotify = GetAttributeValues(field, NotifyCanExecuteChangedForAttributeName);
         var setterAccess = GetSetterAccessLevel(field);
         var isPrimitiveType = IsPrimitiveValueType(field.Type);
+        var requiresUnsafe = RequiresUnsafeContext(field.Type);
 
         return new FieldInfo(
             field.Name,
@@ -200,7 +201,8 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             alsoNotify,
             commandsToNotify,
             setterAccess,
-            isPrimitiveType
+            isPrimitiveType,
+            requiresUnsafe
         );
     }
 
@@ -275,6 +277,15 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     }
 
     /// <summary>
+    /// Determines whether emitting the type requires an unsafe declaration context.
+    /// </summary>
+    private static bool RequiresUnsafeContext(ITypeSymbol type)
+    {
+        return type.TypeKind is TypeKind.Pointer or TypeKind.FunctionPointer
+            || (type is IArrayTypeSymbol arrayType && RequiresUnsafeContext(arrayType.ElementType));
+    }
+
+    /// <summary>
     /// Determines if the type is a primitive value type that supports direct == comparison.
     /// </summary>
     private static bool IsPrimitiveValueType(ITypeSymbol type)
@@ -344,12 +355,22 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         for (var index = 0; index < classInfo.TypeDeclarations.Length; index++)
         {
             var declaration = classInfo.TypeDeclarations[index];
+            var isTarget = index == classInfo.TypeDeclarations.Length - 1;
             var requiredModifiers =
                 declaration.RequiredModifiers.Length == 0
                     ? string.Empty
                     : string.Join(" ", declaration.RequiredModifiers) + " ";
+            if (
+                isTarget
+                && classInfo.Fields.Any(static field => field.RequiresUnsafe)
+                && !declaration.RequiredModifiers.Contains("unsafe")
+            )
+            {
+                requiredModifiers += "unsafe ";
+            }
+
             var interfaces = string.Empty;
-            if (index == classInfo.TypeDeclarations.Length - 1)
+            if (isTarget)
             {
                 var interfaceList = new List<string>();
                 if (!classInfo.AlreadyImplementsInpc)

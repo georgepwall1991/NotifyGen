@@ -51,6 +51,11 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
     /// </summary>
     public bool IsPrimitiveType { get; }
 
+    /// <summary>
+    /// Whether emitting this field's type requires an unsafe declaration context.
+    /// </summary>
+    public bool RequiresUnsafe { get; }
+
     public FieldInfo(
         string fieldName,
         string propertyName,
@@ -59,7 +64,8 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         ImmutableArray<string> alsoNotify,
         ImmutableArray<string> commandsToNotify,
         string? setterAccess = null,
-        bool isPrimitiveType = false
+        bool isPrimitiveType = false,
+        bool requiresUnsafe = false
     )
     {
         FieldName = fieldName;
@@ -70,6 +76,7 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         CommandsToNotify = commandsToNotify;
         SetterAccess = setterAccess;
         IsPrimitiveType = isPrimitiveType;
+        RequiresUnsafe = requiresUnsafe;
     }
 
     public bool Equals(FieldInfo other)
@@ -80,6 +87,7 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             && IsNullable == other.IsNullable
             && SetterAccess == other.SetterAccess
             && IsPrimitiveType == other.IsPrimitiveType
+            && RequiresUnsafe == other.RequiresUnsafe
             && AlsoNotify.SequenceEqual(other.AlsoNotify)
             && CommandsToNotify.SequenceEqual(other.CommandsToNotify);
     }
@@ -100,6 +108,7 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             hash = hash * 31 + IsNullable.GetHashCode();
             hash = hash * 31 + (SetterAccess?.GetHashCode() ?? 0);
             hash = hash * 31 + IsPrimitiveType.GetHashCode();
+            hash = hash * 31 + RequiresUnsafe.GetHashCode();
             foreach (var propertyName in AlsoNotify)
                 hash = hash * 31 + (propertyName?.GetHashCode() ?? 0);
             foreach (var commandName in CommandsToNotify)

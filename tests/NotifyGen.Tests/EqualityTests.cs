@@ -281,6 +281,34 @@ public class EqualityTests
     }
 
     [Fact]
+    public void FieldInfo_Equals_DifferentRequiresUnsafe_ReturnsFalse()
+    {
+        var safe = new FieldInfo(
+            "_value",
+            "Value",
+            "int*",
+            false,
+            ImmutableArray<string>.Empty,
+            ImmutableArray<string>.Empty,
+            isPrimitiveType: true,
+            requiresUnsafe: false
+        );
+        var requiresUnsafe = new FieldInfo(
+            "_value",
+            "Value",
+            "int*",
+            false,
+            ImmutableArray<string>.Empty,
+            ImmutableArray<string>.Empty,
+            isPrimitiveType: true,
+            requiresUnsafe: true
+        );
+
+        safe.Should().NotBe(requiresUnsafe);
+        safe.GetHashCode().Should().NotBe(requiresUnsafe.GetHashCode());
+    }
+
+    [Fact]
     public void FieldInfo_Equals_DifferentAlsoNotify_ReturnsFalse()
     {
         // Arrange
