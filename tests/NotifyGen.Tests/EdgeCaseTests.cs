@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.CodeAnalysis;
+using NotifyGen.Generator;
 
 namespace NotifyGen.Tests;
 
@@ -26,14 +27,16 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
 
         var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "Wrapper.g.cs");
         generatedSource.Should().NotBeNull();
-        generatedSource.Should().Contain("public partial class Wrapper<T> : INotifyPropertyChanged");
+        generatedSource
+            .Should()
+            .Contain("public partial class Wrapper<T> : INotifyPropertyChanged");
         generatedSource.Should().Contain("public T Value");
     }
 
@@ -58,7 +61,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -88,45 +91,47 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
 
         var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "Config.g.cs");
         generatedSource.Should().NotBeNull();
-        generatedSource.Should().Contain("public string VeryLongFieldNameThatExceedsTypicalNamingConventionsButShouldStillWork");
+        generatedSource
+            .Should()
+            .Contain(
+                "public string VeryLongFieldNameThatExceedsTypicalNamingConventionsButShouldStillWork"
+            );
     }
 
     [Fact]
     public void Generator_WithNestedClass_GeneratesCorrectly()
     {
-        // Arrange
         var source = """
             using NotifyGen;
 
             namespace TestNamespace
             {
-                public class Outer
+                public partial class Outer
                 {
                     [Notify]
                     public partial class Inner
                     {
-                        private string _value;
+                        private string _value = "";
                     }
                 }
             }
             """;
 
-        // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (outputCompilation, _, _) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
-        // Assert
-        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
-
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "Inner.g.cs");
-        generatedSource.Should().NotBeNull();
-        generatedSource.Should().Contain("public partial class Inner : INotifyPropertyChanged");
+        outputCompilation
+            .GetTypeByMetadataName("TestNamespace.Outer+Inner")!
+            .GetMembers("Value")
+            .Should()
+            .ContainSingle();
+        outputCompilation.GetTypeByMetadataName("TestNamespace.Inner").Should().BeNull();
     }
 
     [Fact]
@@ -141,31 +146,43 @@ public class EdgeCaseTests
                 [Notify]
                 public partial class Mixed
                 {
-                    private string _validField;
-                    private string noUnderscoreField;
-                    public string PublicField;
-                    protected string ProtectedField;
-                    internal string InternalField;
-                    private readonly string _readonlyField;
-                    private const string ConstField = "const";
-                    private static string _staticField;
+                    private string _validField = "";
+                    private string noUnderscoreField = "";
+                    public string PublicField = "";
+                    protected string ProtectedField = "";
+                    internal string InternalField = "";
+                    private readonly string _readonlyField = "";
+                    private const string _constField = "";
+                    private static string _staticField = "";
                 }
             }
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (outputCompilation, _, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(
+            source
+        );
 
         // Assert
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "Mixed.g.cs");
-        generatedSource.Should().NotBeNull();
+        var generatedSource = runResult
+            .Results.Single()
+            .GeneratedSources.Single()
+            .SourceText.ToString();
         generatedSource.Should().Contain("public string ValidField");
         generatedSource.Should().NotContain("NoUnderscoreField");
-        generatedSource.Should().NotContain("noUnderscoreField");
         generatedSource.Should().NotContain("PublicField");
         generatedSource.Should().NotContain("ProtectedField");
         generatedSource.Should().NotContain("InternalField");
-        // Note: readonly and static fields are skipped by the compiler
+        generatedSource.Should().NotContain("ReadonlyField");
+        generatedSource.Should().NotContain("ConstField");
+        generatedSource.Should().NotContain("StaticField");
+        outputCompilation
+            .GetTypeByMetadataName("TestNamespace.Mixed")!
+            .GetMembers()
+            .OfType<IPropertySymbol>()
+            .Select(static property => property.Name)
+            .Should()
+            .Equal("ValidField");
     }
 
     [Fact]
@@ -192,7 +209,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -230,7 +247,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -261,7 +278,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "Edge.g.cs");
@@ -293,12 +310,15 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
 
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "ComplexTypes.g.cs");
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(
+            runResult,
+            "ComplexTypes.g.cs"
+        );
         generatedSource.Should().NotBeNull();
         // Generator outputs fully qualified type names
         generatedSource.Should().Contain("NestedGeneric");
@@ -324,15 +344,20 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
 
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "FileScopedPerson.g.cs");
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(
+            runResult,
+            "FileScopedPerson.g.cs"
+        );
         generatedSource.Should().NotBeNull();
         generatedSource.Should().Contain("namespace TestNamespace");
-        generatedSource.Should().Contain("public partial class FileScopedPerson : INotifyPropertyChanged");
+        generatedSource
+            .Should()
+            .Contain("public partial class FileScopedPerson : INotifyPropertyChanged");
         generatedSource.Should().Contain("public string Name");
     }
 
@@ -356,12 +381,15 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
 
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "NullableValues.g.cs");
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(
+            runResult,
+            "NullableValues.g.cs"
+        );
         generatedSource.Should().NotBeNull();
         generatedSource.Should().Contain("int? NullableInt");
         generatedSource.Should().Contain("double? NullableDouble");
@@ -386,12 +414,15 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
 
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "TupleContainer.g.cs");
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(
+            runResult,
+            "TupleContainer.g.cs"
+        );
         generatedSource.Should().NotBeNull();
         generatedSource.Should().Contain("SimpleTuple");
         generatedSource.Should().Contain("NamedTuple");
@@ -416,10 +447,13 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "UnderscoreEdge.g.cs");
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(
+            runResult,
+            "UnderscoreEdge.g.cs"
+        );
         generatedSource.Should().NotBeNull();
         // The generator converts _name to Name, so __name becomes _name (property name)
         generatedSource.Should().Contain("public string _doubleUnderscore");
@@ -446,12 +480,15 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
 
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "NumericFields.g.cs");
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(
+            runResult,
+            "NumericFields.g.cs"
+        );
         generatedSource.Should().NotBeNull();
         generatedSource.Should().Contain("public string Field1");
         generatedSource.Should().Contain("public string Field2");
@@ -479,12 +516,15 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
 
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "CombinedAttrs.g.cs");
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(
+            runResult,
+            "CombinedAttrs.g.cs"
+        );
         generatedSource.Should().NotBeNull();
         // Should use custom name
         generatedSource.Should().Contain("public string DisplayName");
@@ -518,11 +558,14 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         // May have warnings about types, but should compile
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "RegexContainer.g.cs");
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(
+            runResult,
+            "RegexContainer.g.cs"
+        );
         generatedSource.Should().NotBeNull();
         generatedSource.Should().Contain("Pattern");
         generatedSource.Should().Contain("Uri");
@@ -548,7 +591,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -563,22 +606,21 @@ public class EdgeCaseTests
     [Fact]
     public void Generator_WithDeeplyNestedClass_GeneratesCorrectly()
     {
-        // Arrange
         var source = """
             using NotifyGen;
 
             namespace TestNamespace
             {
-                public class Level1
+                public partial class Level1
                 {
-                    public class Level2
+                    public partial class Level2
                     {
-                        public class Level3
+                        public partial class Level3
                         {
                             [Notify]
                             public partial class DeepNested
                             {
-                                private string _value;
+                                private string _value = "";
                             }
                         }
                     }
@@ -586,15 +628,304 @@ public class EdgeCaseTests
             }
             """;
 
-        // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (outputCompilation, _, _) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
-        // Assert
-        diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
+        outputCompilation
+            .GetTypeByMetadataName("TestNamespace.Level1+Level2+Level3+DeepNested")!
+            .GetMembers("Value")
+            .Should()
+            .ContainSingle();
+        outputCompilation.GetTypeByMetadataName("TestNamespace.DeepNested").Should().BeNull();
+    }
 
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "DeepNested.g.cs");
-        generatedSource.Should().NotBeNull();
-        generatedSource.Should().Contain("public partial class DeepNested : INotifyPropertyChanged");
-        generatedSource.Should().Contain("public string Value");
+    [Fact]
+    public void Generator_WithSameSimpleName_UsesUniqueSourceHints()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace A
+            {
+                [Notify]
+                public partial class Model
+                {
+                    private string _name = "";
+                }
+            }
+
+            namespace B
+            {
+                [Notify]
+                public partial class Model
+                {
+                    private string _name = "";
+                }
+            }
+
+            namespace C
+            {
+                public partial class OuterA
+                {
+                    [Notify]
+                    public partial class Model
+                    {
+                        private string _name = "";
+                    }
+                }
+
+                public partial struct OuterB
+                {
+                    [Notify]
+                    public partial class Model
+                    {
+                        private string _name = "";
+                    }
+                }
+            }
+            """;
+
+        var (outputCompilation, _, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(
+            source
+        );
+        var generatedSources = runResult.Results.Single().GeneratedSources;
+
+        generatedSources.Should().HaveCount(4);
+        generatedSources.Select(static result => result.HintName).Should().OnlyHaveUniqueItems();
+        outputCompilation
+            .GetTypeByMetadataName("A.Model")!
+            .GetMembers("Name")
+            .Should()
+            .ContainSingle();
+        outputCompilation
+            .GetTypeByMetadataName("B.Model")!
+            .GetMembers("Name")
+            .Should()
+            .ContainSingle();
+        outputCompilation
+            .GetTypeByMetadataName("C.OuterA+Model")!
+            .GetMembers("Name")
+            .Should()
+            .ContainSingle();
+        outputCompilation
+            .GetTypeByMetadataName("C.OuterB+Model")!
+            .GetMembers("Name")
+            .Should()
+            .ContainSingle();
+    }
+
+    [Theory]
+    [InlineData("public partial class Container")]
+    [InlineData("public partial struct Container")]
+    [InlineData("public partial record class Container")]
+    [InlineData("public partial record struct Container")]
+    [InlineData("public partial interface Container")]
+    [InlineData("internal partial class Container")]
+    [InlineData("public static partial class Container")]
+    [InlineData("public abstract partial class Container")]
+    [InlineData("public sealed partial class Container")]
+    [InlineData("public readonly partial struct Container")]
+    [InlineData("public ref partial struct Container")]
+    public void Generator_WithSupportedContainingType_GeneratesOnNestedType(
+        string containerDeclaration
+    )
+    {
+        var source = $$"""
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                {{containerDeclaration}}
+                {
+                    [Notify]
+                    public partial class Inner
+                    {
+                        private int _value;
+                    }
+                }
+            }
+            """;
+
+        var (outputCompilation, _, _) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
+
+        outputCompilation
+            .GetTypeByMetadataName("TestNamespace.Container+Inner")!
+            .GetMembers("Value")
+            .Should()
+            .ContainSingle();
+    }
+
+    [Fact]
+    public void Generator_WithUnsafeContainingType_PreservesUnsafeContext()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                public unsafe partial class Container
+                {
+                    [Notify]
+                    public partial class Inner
+                    {
+                        private int* _value;
+                    }
+                }
+            }
+            """;
+
+        var (_, _, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(
+            source,
+            allowUnsafe: true
+        );
+        var generatedSource = runResult
+            .Results.Single()
+            .GeneratedSources.Single()
+            .SourceText.ToString();
+
+        generatedSource.Should().Contain("public unsafe partial class Container");
+        generatedSource.Should().Contain("public int* Value");
+    }
+
+    [Theory]
+    [InlineData("int*")]
+    [InlineData("delegate*<int, void>")]
+    public void Generator_WithMemberScopedUnsafeField_MarksGeneratedTargetUnsafe(string fieldType)
+    {
+        var source = $$"""
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class Model
+                {
+                    private unsafe {{fieldType}} _value;
+                }
+            }
+            """;
+
+        var (outputCompilation, _, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(
+            source,
+            allowUnsafe: true
+        );
+        var generatedSource = runResult
+            .Results.Single()
+            .GeneratedSources.Single()
+            .SourceText.ToString();
+
+        outputCompilation
+            .GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Warning)
+            .Should()
+            .BeEmpty("valid generated unsafe members should compile without warnings");
+        generatedSource.Should().Contain("public unsafe partial class Model");
+        generatedSource.Should().Contain($"public {fieldType} Value");
+    }
+
+    [Fact]
+    public void Generator_WithGenericContainingType_PreservesDeclarationShape()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                public static partial class Outer<T> where T : class, new()
+                {
+                    [Notify]
+                    public partial class Inner<TValue> where TValue : struct
+                    {
+                        private TValue _value;
+                    }
+                }
+            }
+            """;
+
+        var (outputCompilation, _, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(
+            source
+        );
+        var generatedSource = runResult
+            .Results.Single()
+            .GeneratedSources.Single()
+            .SourceText.ToString();
+
+        outputCompilation
+            .GetTypeByMetadataName("TestNamespace.Outer`1+Inner`1")!
+            .GetMembers("Value")
+            .Should()
+            .ContainSingle();
+        generatedSource.Should().Contain("public static partial class Outer<T>");
+        generatedSource.Should().Contain("public partial class Inner<TValue>");
+    }
+
+    [Fact]
+    public void Generator_WithEscapedIdentifiers_PreservesSourceSyntax()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                public partial interface @interface<@class>
+                {
+                    [Notify]
+                    public partial class Inner<@struct> where @struct : struct
+                    {
+                        private @struct _value;
+                    }
+                }
+            }
+            """;
+
+        var (_, _, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
+        var generatedSource = runResult
+            .Results.Single()
+            .GeneratedSources.Single()
+            .SourceText.ToString();
+
+        generatedSource.Should().Contain("public partial interface @interface<@class>");
+        generatedSource.Should().Contain("public partial class Inner<@struct>");
+    }
+
+    [Fact]
+    public void Generator_SourceHints_AreUniqueUnderOrdinalIgnoreCaseComparison()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace AAG
+            {
+                [Notify]
+                public partial class A
+                {
+                    private int _value;
+                }
+            }
+
+            namespace AAa
+            {
+                [Notify]
+                public partial class A
+                {
+                    private int _value;
+                }
+            }
+            """;
+
+        var (_, _, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
+        var hintNames = runResult
+            .Results.Single()
+            .GeneratedSources.Select(static sourceResult => sourceResult.HintName);
+
+        hintNames.Distinct(StringComparer.OrdinalIgnoreCase).Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void SourceHintName_WithLongIdentity_BoundsEveryPathSegment()
+    {
+        var hintName = SourceHintName.Create(new string('N', 300) + ".Model", new string('T', 300));
+
+        hintName.Split('/').Should().OnlyContain(static segment => segment.Length <= 100);
+        hintName.Should().EndWith("/Type.g.cs");
     }
 }

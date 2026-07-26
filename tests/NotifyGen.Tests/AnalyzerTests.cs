@@ -62,7 +62,10 @@ public class AnalyzerTests
 
         // Assert
         diagnostics.Should().ContainSingle(d => d.Id == "NOTIFY002");
-        diagnostics.First(d => d.Id == "NOTIFY002").Severity.Should().Be(DiagnosticSeverity.Warning);
+        diagnostics
+            .First(d => d.Id == "NOTIFY002")
+            .Severity.Should()
+            .Be(DiagnosticSeverity.Warning);
     }
 
     [Fact]
@@ -351,19 +354,264 @@ public class AnalyzerTests
         fixedSource.Should().Be(expectedFixed);
     }
 
+    [Fact]
+    public void Generator_NonPartialTarget_EmitsNoSource()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public class Person
+                {
+                    private string _name;
+                }
+            }
+            """;
+
+        var (outputCompilation, _, runResult) = GeneratorTestHelper.RunGenerator(source);
+
+        outputCompilation
+            .GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Should()
+            .BeEmpty();
+        runResult.Results.Single().GeneratedSources.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Analyzer_NonPartialContainingType_ReportsSingleError()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                public class Outer
+                {
+                    [Notify]
+                    public partial class Inner
+                    {
+                        private string _name;
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = diagnostics.Should().ContainSingle().Subject;
+        diagnostic.Id.Should().Be("NOTIFY006");
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Error);
+        diagnostic.GetMessage().Should().Contain("Outer").And.Contain("Inner");
+        SourceText.From(source).ToString(diagnostic.Location.SourceSpan).Should().Be("Outer");
+    }
+
+    [Fact]
+    public async Task Analyzer_MultipleNonPartialContainingTypes_ReportsEveryBlocker()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                public class Outer
+                {
+                    public class Middle
+                    {
+                        [Notify]
+                        public partial class Inner
+                        {
+                            private string _name;
+                        }
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().HaveCount(2);
+        diagnostics.Should().OnlyContain(static diagnostic => diagnostic.Id == "NOTIFY006");
+        diagnostics
+            .Select(diagnostic => SourceText.From(source).ToString(diagnostic.Location.SourceSpan))
+            .Should()
+            .BeEquivalentTo("Middle", "Outer");
+        diagnostics
+            .Select(static diagnostic => diagnostic.GetMessage())
+            .Should()
+            .OnlyContain(static message => message.Contains("Inner"));
+    }
+
+    [Fact]
+    public void Generator_NonPartialContainingType_EmitsNoSource()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                public class Outer
+                {
+                    [Notify]
+                    public partial class Inner
+                    {
+                        private string _name;
+                    }
+                }
+            }
+            """;
+
+        var (outputCompilation, _, runResult) = GeneratorTestHelper.RunGenerator(source);
+
+        outputCompilation
+            .GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Should()
+            .BeEmpty();
+        runResult.Results.Single().GeneratedSources.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Analyzer_FileLocalTarget_ReportsError()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            file partial class Person
+            {
+                private string _name;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = diagnostics.Should().ContainSingle().Subject;
+        diagnostic.Id.Should().Be("NOTIFY007");
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Error);
+        SourceText.From(source).ToString(diagnostic.Location.SourceSpan).Should().Be("Person");
+    }
+
+    [Fact]
+    public void Generator_FileLocalTarget_EmitsNoSource()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            file partial class Person
+            {
+                private string _name;
+            }
+            """;
+
+        var (_, _, runResult) = GeneratorTestHelper.RunGenerator(source);
+
+        runResult.Results.Single().GeneratedSources.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Analyzer_FileLocalContainingType_ReportsError()
+    {
+        var source = """
+            using NotifyGen;
+
+            file partial class Outer
+            {
+                [Notify]
+                public partial class Inner
+                {
+                    private string _name;
+                }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = diagnostics.Should().ContainSingle().Subject;
+        diagnostic.Id.Should().Be("NOTIFY007");
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Error);
+        SourceText.From(source).ToString(diagnostic.Location.SourceSpan).Should().Be("Outer");
+    }
+
+    [Fact]
+    public void Generator_FileLocalContainingType_EmitsNoSource()
+    {
+        var source = """
+            using NotifyGen;
+
+            file partial class Outer
+            {
+                [Notify]
+                public partial class Inner
+                {
+                    private string _name;
+                }
+            }
+            """;
+
+        var (_, _, runResult) = GeneratorTestHelper.RunGenerator(source);
+
+        runResult.Results.Single().GeneratedSources.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CodeFix_NonPartialContainingType_AddsPartialToContainer()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                public class Outer
+                {
+                    [Notify]
+                    public partial class Inner
+                    {
+                        private string _name;
+                    }
+                }
+            }
+            """;
+        var expectedFixed = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                public partial class Outer
+                {
+                    [Notify]
+                    public partial class Inner
+                    {
+                        private string _name;
+                    }
+                }
+            }
+            """;
+
+        var fixedSource = await ApplyCodeFixAsync(source, "NOTIFY006");
+
+        fixedSource.Should().Be(expectedFixed);
+    }
+
     private static List<MetadataReference> GetRequiredReferences()
     {
         var references = new List<MetadataReference>
         {
             MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(System.ComponentModel.INotifyPropertyChanged).Assembly.Location),
+            MetadataReference.CreateFromFile(
+                typeof(System.ComponentModel.INotifyPropertyChanged).Assembly.Location
+            ),
             MetadataReference.CreateFromFile(typeof(NotifyAttribute).Assembly.Location),
         };
 
         // Add runtime assemblies if available
         foreach (var name in new[] { "System.Runtime", "netstandard" })
         {
-            var asm = AppDomain.CurrentDomain.GetAssemblies()
+            var asm = AppDomain
+                .CurrentDomain.GetAssemblies()
                 .FirstOrDefault(a => a.GetName().Name == name);
             if (asm != null)
                 references.Add(MetadataReference.CreateFromFile(asm.Location));
@@ -372,15 +620,20 @@ public class AnalyzerTests
         return references;
     }
 
-    private static CSharpCompilation CreateCompilation(string source, IEnumerable<MetadataReference> references)
+    private static CSharpCompilation CreateCompilation(
+        string source,
+        IEnumerable<MetadataReference> references
+    )
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(source);
         return CSharpCompilation.Create(
             "TestAssembly",
             new[] { syntaxTree },
             references,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-                .WithNullableContextOptions(NullableContextOptions.Enable));
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary
+            ).WithNullableContextOptions(NullableContextOptions.Enable)
+        );
     }
 
     private static async Task<IReadOnlyList<Diagnostic>> GetDiagnosticsAsync(string source)
@@ -395,7 +648,10 @@ public class AnalyzerTests
         return diagnostics.ToList();
     }
 
-    private static async Task<string> ApplyCodeFixAsync(string source)
+    private static async Task<string> ApplyCodeFixAsync(
+        string source,
+        string diagnosticId = "NOTIFY001"
+    )
     {
         var references = GetRequiredReferences();
         var compilation = CreateCompilation(source, references);
@@ -405,9 +661,9 @@ public class AnalyzerTests
         var compilationWithAnalyzers = compilation.WithAnalyzers(analyzers);
         var diagnostics = await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
 
-        var notify001Diagnostic = diagnostics.FirstOrDefault(d => d.Id == "NOTIFY001");
-        if (notify001Diagnostic == null)
-            return source; // No diagnostic, return original
+        var requestedDiagnostic = diagnostics.FirstOrDefault(d => d.Id == diagnosticId);
+        if (requestedDiagnostic == null)
+            return source;
 
         // Create a workspace and document
         var workspace = new AdhocWorkspace();
@@ -420,9 +676,11 @@ public class AnalyzerTests
             "TestProject",
             "TestProject",
             LanguageNames.CSharp,
-            compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-                .WithNullableContextOptions(NullableContextOptions.Enable),
-            metadataReferences: references);
+            compilationOptions: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary
+            ).WithNullableContextOptions(NullableContextOptions.Enable),
+            metadataReferences: references
+        );
 
         var project = workspace.AddProject(projectInfo);
 
@@ -430,9 +688,11 @@ public class AnalyzerTests
             DocumentInfo.Create(
                 documentId,
                 "Test.cs",
-                loader: TextLoader.From(TextAndVersion.Create(
-                    SourceText.From(source),
-                    VersionStamp.Create()))));
+                loader: TextLoader.From(
+                    TextAndVersion.Create(SourceText.From(source), VersionStamp.Create())
+                )
+            )
+        );
 
         // Create and apply code fix
         var codeFixer = new NotifyCodeFixProvider();
@@ -441,17 +701,18 @@ public class AnalyzerTests
         var freshCompilation = await document.Project.GetCompilationAsync();
         var freshCompilationWithAnalyzers = freshCompilation!.WithAnalyzers(analyzers);
         var freshDiagnostics = await freshCompilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
-        var freshNotify001 = freshDiagnostics.FirstOrDefault(d => d.Id == "NOTIFY001");
+        var freshDiagnostic = freshDiagnostics.FirstOrDefault(d => d.Id == diagnosticId);
 
-        if (freshNotify001 == null)
+        if (freshDiagnostic == null)
             return source;
 
         var actions = new List<CodeAction>();
         var context = new CodeFixContext(
             document,
-            freshNotify001,
+            freshDiagnostic,
             (action, _) => actions.Add(action),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         await codeFixer.RegisterCodeFixesAsync(context);
 
@@ -586,7 +847,7 @@ public class AnalyzerTests
     }
 
     [Fact]
-    public void CodeFix_FixableDiagnosticIds_ContainsNotify001()
+    public void CodeFix_FixableDiagnosticIds_ContainsPartialTypeDiagnostics()
     {
         // Arrange
         var codeFixer = new NotifyCodeFixProvider();
@@ -595,8 +856,7 @@ public class AnalyzerTests
         var fixableIds = codeFixer.FixableDiagnosticIds;
 
         // Assert
-        fixableIds.Should().ContainSingle();
-        fixableIds[0].Should().Be("NOTIFY001");
+        fixableIds.Should().BeEquivalentTo("NOTIFY001", "NOTIFY006");
     }
 
     [Fact]
@@ -709,6 +969,31 @@ public class AnalyzerTests
 
         // Assert
         diagnostics.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("private static string _invalidField = \"\";", "NOTIFY004")]
+    [InlineData("private readonly string _invalidField = \"\";", "NOTIFY005")]
+    public async Task Analyzer_IneligibleField_ReportsSpecificDiagnostic(
+        string invalidField,
+        string diagnosticId
+    )
+    {
+        var source = $$"""
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                private string _validField = "";
+                {{invalidField}}
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == diagnosticId);
+        diagnostics.Should().NotContain(diagnostic => diagnostic.Id == "NOTIFY002");
     }
 
     #endregion

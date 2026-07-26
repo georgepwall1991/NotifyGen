@@ -12,24 +12,24 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>NotifyGen</PackageId>
-    <Version>1.4.0</Version>
+    <Version>1.6.0</Version>
     <Authors>George Wall</Authors>
     <Title>NotifyGen - INotifyPropertyChanged Source Generator</Title>
-    <Description>The fastest INotifyPropertyChanged source generator for .NET. Eliminates MVVM boilerplate with a single [Notify] attribute. Zero runtime overhead, full IntelliSense, and debuggable generated code.
+    <Description>A fast INotifyPropertyChanged source generator for .NET. Eliminates MVVM boilerplate with a single [Notify] attribute, no runtime dependency, full IntelliSense, and debuggable generated code.
 
 Features:
 • Auto-generates properties with PropertyChanged notifications
 • Built-in equality guards prevent redundant events
-• Partial hooks: OnPropertyChanging/OnPropertyChanged
+• Partial hooks: On{Property}Changing(oldValue, newValue) and On{Property}Changed()
 • [NotifyAlso] for dependent properties
 • [NotifySetter] for access control (private, protected, internal)
 • INotifyPropertyChanging support for undo/redo scenarios
 • [NotifyCanExecuteChangedFor] for automatic command refresh
 • [NotifySuppressable] for batch notification suppression
-• Works with WPF, MAUI, Blazor, Avalonia, Uno Platform, WinUI, Xamarin
-• AOT Compatible and Trimming Safe
-
-Benchmark-proven fastest: Outperforms CommunityToolkit.Mvvm, Prism, and Fody in all tests.</Description>
+• Nested [Notify] class support with generic declaration preservation
+• Analyzer diagnostics and code fixes for invalid partial declarations
+• Works with WPF, MAUI, Blazor, Avalonia, Uno Platform, WinUI, and Xamarin
+• AOT compatible and trimming safe</Description>
     <PackageTags>MVVM;INotifyPropertyChanged;INPC;WPF;MAUI;Blazor;Avalonia;Uno;Xamarin;WinUI;UWP;SourceGenerator;CodeGeneration;Roslyn;PropertyChanged;DataBinding;ViewModel;ReactiveUI;dotnet;csharp;boilerplate;code-generator;performance;aot;trimming;android;ios;mac;windows;linux</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/georgepwall1991/NotifyGen</PackageProjectUrl>
@@ -37,11 +37,12 @@ Benchmark-proven fastest: Outperforms CommunityToolkit.Mvvm, Prism, and Fody in 
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>v1.4.0: Major feature release with Tier 1 features:
-• INotifyPropertyChanging support via [Notify(ImplementChanging = true)]
-• [NotifyCanExecuteChangedFor] attribute for automatic command CanExecute refresh
-• [NotifySuppressable] attribute for batch notification suppression (unique feature!)
-• 140 tests with 94.81% line coverage</PackageReleaseNotes>
+    <PackageReleaseNotes>v1.6.0:
+• Generate nested [Notify] classes safely across partial containing types
+• Add NOTIFY006 with a Make type partial code fix for containing declarations
+• Reject static, const, and readonly fields consistently before generation
+• Preserve generic syntax, modifiers, escaped identifiers, and collision-safe source hints
+• Report NOTIFY003 when [NotifyAlso] targets a property from an ineligible field</PackageReleaseNotes>
     <Copyright>Copyright (c) 2025-2026 George Wall</Copyright>
 
     <!-- Analyzer/Generator packaging -->

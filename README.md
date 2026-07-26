@@ -247,19 +247,19 @@ The underscore is stripped and the first letter is capitalized.
 
 ### What Fields Are Eligible?
 
-NotifyGen generates properties **only** for private instance fields with underscore prefix. Here's what works and what doesn't:
+NotifyGen generates properties only for mutable, private instance fields with an underscore prefix. The `private` modifier may be explicit or implicit. Here's what works and what doesn't:
 
 **✅ Eligible Fields:**
 ```csharp
 private string _name;           // ✓ Instance, private, underscore
 private int _age;               // ✓ All types work (primitives, classes, structs)
 private bool? _isActive;        // ✓ Nullable types supported
+string _implicitPrivate;        // ✓ Fields without a modifier are private in a class
 ```
 
 **❌ Ineligible Fields:**
 ```csharp
 public string _name;            // ✗ Must be private
-string _name;                   // ✗ Must be private (default is private in classes, but be explicit)
 protected string _name;         // ✗ Must be private
 internal string _name;          // ✗ Must be private
 
@@ -275,10 +275,7 @@ private string _;               // ✗ Too short (need at least 2 characters)
 
 If you mark a class with `[Notify]` but have no eligible fields, NotifyGen will show:
 ```
-NOTIFY002: Class 'MyClass' has no eligible fields for property generation.
-Found 2 ineligible fields:
-  - 'name' (missing underscore prefix, should be '_name')
-  - '_logger' (readonly field cannot generate properties)
+NOTIFY002: Class 'MyClass' is marked with [Notify] but has no private fields with underscore prefix (e.g., '_fieldName'). No properties will be generated.
 ```
 
 **Excluding Fields with [NotifyIgnore]:**
@@ -654,7 +651,7 @@ public partial class Person : INotifyPropertyChanged
 - Nested suppression scopes supported (uses reference counting)
 - Duplicate property names deduplicated (HashSet)
 - Zero allocations when not suppressing
-- Thread-safe within a single scope
+- Designed for the owning UI thread; suppression state is not synchronized
 
 #### Selective Suppression with `AlwaysNotify`
 
@@ -730,6 +727,24 @@ public partial class MyViewModel : ViewModelBase
 }
 ```
 
+### Nested `[Notify]` Classes
+
+NotifyGen supports `[Notify]` classes nested inside classes, structs, interfaces, records, and record structs. Every declaration in the containing chain must be `partial` so the generator can reopen it:
+
+```csharp
+public partial class Workspace<T>
+    where T : class
+{
+    [Notify]
+    public partial class Editor
+    {
+        private string _title;
+    }
+}
+```
+
+Generic parameters, accessibility, declaration kind, and required modifiers such as `unsafe` are preserved in generated code, which remains compatible with constrained generic declaration chains. If a containing type is not partial, `NOTIFY006` identifies that declaration and offers the same **Make type partial** code fix as `NOTIFY001`. File-local targets and containers are not supported because generated partial declarations are emitted in a separate source file; `NOTIFY007` reports the unsupported declaration and generation is withheld.
+
 ## Built-in Analyzers & Code Fixes
 
 NotifyGen includes analyzers that catch mistakes at compile time:
@@ -737,10 +752,14 @@ NotifyGen includes analyzers that catch mistakes at compile time:
 | Code | Severity | Description | Auto-Fix |
 |------|----------|-------------|----------|
 | NOTIFY001 | Error | Class with `[Notify]` must be declared `partial` | Yes |
-| NOTIFY002 | Warning | No eligible fields found (need private `_underscore` fields) | — |
+| NOTIFY002 | Warning | No eligible fields found (need mutable private `_underscore` fields) | — |
 | NOTIFY003 | Warning | `[NotifyAlso("Xyz")]` references property `Xyz` that doesn't exist | — |
+| NOTIFY004 | Info | Static or const field cannot generate an instance property | — |
+| NOTIFY005 | Info | Readonly field cannot generate a property with a setter | — |
+| NOTIFY006 | Error | A type containing a nested `[Notify]` class must be `partial` | Yes |
+| NOTIFY007 | Error | A `[Notify]` target or containing type has file-local accessibility | — |
 
-**NOTIFY001 has a code fix** — when you see the error, click the lightbulb (or press `Ctrl+.` / `Cmd+.`) and select "Make class partial" to automatically add the `partial` modifier.
+**NOTIFY001 and NOTIFY006 have a code fix** — click the lightbulb (or press `Ctrl+.` / `Cmd+.`) and select "Make type partial" to add the required modifier.
 
 ## Performance
 
@@ -749,7 +768,7 @@ NotifyGen is built for large codebases:
 - **Incremental generation** - Only regenerates code for classes that actually changed
 - **No runtime overhead** - All code is generated at compile time
 - **Efficient equality checks** - Uses `EqualityComparer<T>.Default` for optimal performance
-- **Zero allocations in setters** - No boxing, no LINQ, no closures
+- **Lean generated setters** - No reflection, LINQ, closures, or avoidable boxing
 
 The generator uses Roslyn's incremental compilation pipeline with proper `IEquatable<T>` implementations on all data structures, so your IDE stays responsive even with hundreds of `[Notify]` classes.
 
@@ -861,7 +880,6 @@ using (viewModel.SuppressNotifications())
     viewModel.IsActive = true;
 }  // PropertyChanged fires for both here
 ```
-```
 
 ## Troubleshooting
 
@@ -889,13 +907,9 @@ public partial class MyClass { }
 
 **NOTIFY002: No eligible fields?**
 
-Check the diagnostic message - it will tell you exactly why fields were rejected:
+The diagnostic reports that the class has no eligible fields:
 ```
-NOTIFY002: Class 'MyClass' has no eligible fields for property generation.
-Found 3 ineligible fields:
-  - 'name' (missing underscore prefix, should be '_name')
-  - '_logger' (readonly field cannot generate properties)
-  - '_shared' (static field cannot generate properties)
+NOTIFY002: Class 'MyClass' is marked with [Notify] but has no private fields with underscore prefix (e.g., '_fieldName'). No properties will be generated.
 ```
 
 Common fixes:
@@ -917,9 +931,52 @@ private bool? _isActive;
 
 **NOTIFY004/NOTIFY005: Static or readonly fields?**
 
-These are informational warnings. If you see them:
+These are informational diagnostics. If you see them:
 - Remove `static`, `const`, or `readonly` modifier if you want property generation
 - Add `[NotifyIgnore]` to suppress the warning if the field should not generate a property
+
+**NOTIFY006: Containing type is not partial?**
+
+Every class, struct, interface, record, or record struct around a nested `[Notify]` class must be `partial`:
+```csharp
+// Wrong
+public class Workspace
+{
+    [Notify]
+    public partial class Editor { private string _title; }
+}
+
+// Right
+public partial class Workspace
+{
+    [Notify]
+    public partial class Editor { private string _title; }
+}
+```
+
+Use the **Make type partial** code fix on each reported containing declaration.
+
+**NOTIFY007: File-local type is not supported?**
+
+C# restricts a `file` type to its declaring source file. NotifyGen emits partial declarations into a generated file, so neither a `[Notify]` class nor any of its containing types can use file-local accessibility:
+
+```csharp
+// Wrong - generated source cannot reopen FileOnlyViewModel
+[Notify]
+file partial class FileOnlyViewModel
+{
+    private string _name;
+}
+
+// Right
+[Notify]
+internal partial class ViewModel
+{
+    private string _name;
+}
+```
+
+Replace `file` with an appropriate non-file accessibility modifier to enable generation.
 
 **How to debug generated code?**
 1. Build the project successfully
@@ -928,18 +985,18 @@ These are informational warnings. If you see them:
 4. Open them to see exactly what was generated
 5. Set breakpoints in generated code during debugging
 
-**Migration from other naming conventions?**
+**Custom property names for migrations?**
 
-If you have existing fields with different prefixes (e.g., `m_name`, `mName`), use `[NotifyName]`:
+`[NotifyName]` changes the generated property name, but the field must still follow the private underscore convention:
 ```csharp
 [NotifyName("Name")]
-private string m_name;  // Generates Name property
+private string _legacyName;  // Generates Name
 
 [NotifyName("CustomerID")]
-private int mCustomerId;  // Generates CustomerID property
+private int _legacyCustomerId;  // Generates CustomerID
 ```
 
-**Note:** This is for migration scenarios. New code should follow the underscore convention.
+Use this when the public property name must preserve an existing API. `[NotifyName]` does not make `m_name`, `mName`, or other ineligible field shapes eligible.
 
 ## Samples
 
@@ -947,7 +1004,7 @@ The repository includes sample projects to help you get started:
 
 ### Console Sample (Cross-Platform)
 
-A simple console app demonstrating all NotifyGen features without any UI framework dependencies:
+A simple console app demonstrating NotifyGen's core property-generation features without UI framework dependencies:
 
 ```bash
 dotnet run --project samples/NotifyGen.ConsoleSample
@@ -959,9 +1016,6 @@ This sample shows:
 - `[NotifyName]` for custom property names
 - `[NotifySetter]` for access control
 - `[NotifyIgnore]` for excluded fields
-- `[NotifyCanExecuteChangedFor]` for command refresh
-- `[NotifySuppressable]` for batch updates
-- `ImplementChanging = true` for PropertyChanging events
 - Partial hooks for validation and side effects
 - Equality guards preventing duplicate events
 
@@ -975,7 +1029,7 @@ dotnet run --project samples/NotifyGen.WpfSample
 
 ## Benchmarks
 
-Performance benchmarks are available to verify NotifyGen adds zero runtime overhead:
+[Performance benchmarks](benchmarks/NotifyGen.Benchmarks/README.md) compare generated setters with equivalent hand-written notification code:
 
 ```bash
 # Run all benchmarks

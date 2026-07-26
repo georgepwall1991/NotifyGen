@@ -5,6 +5,9 @@ riderModule.iml
 /_ReSharper.Caches/nupkg/
 nupkg/
 
+# Local worktrees
+.worktrees/
+
 # Test artifacts
 TestResults/
 **/TestResults/
