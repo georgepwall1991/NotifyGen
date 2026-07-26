@@ -17,7 +17,8 @@ internal static class DiagnosticDescriptors
         category: "NotifyGen",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "Classes marked with the [Notify] attribute must be declared as partial to allow the source generator to add the INotifyPropertyChanged implementation.");
+        description: "Classes marked with the [Notify] attribute must be declared as partial to allow the source generator to add the INotifyPropertyChanged implementation."
+    );
 
     /// <summary>
     /// NOTIFY002: No eligible fields found in class.
@@ -29,7 +30,8 @@ internal static class DiagnosticDescriptors
         category: "NotifyGen",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "The [Notify] attribute generates properties for private fields that follow the underscore naming convention (e.g., '_name' generates 'Name' property).");
+        description: "The [Notify] attribute generates properties for private fields that follow the underscore naming convention (e.g., '_name' generates 'Name' property)."
+    );
 
     /// <summary>
     /// NOTIFY003: NotifyAlso references unknown property.
@@ -41,7 +43,8 @@ internal static class DiagnosticDescriptors
         category: "NotifyGen",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "The [NotifyAlso] attribute should reference an existing property name. Check for typos in the property name.");
+        description: "The [NotifyAlso] attribute should reference an existing property name. Check for typos in the property name."
+    );
 
     /// <summary>
     /// NOTIFY004: Static or const field cannot be used for property generation.
@@ -53,7 +56,8 @@ internal static class DiagnosticDescriptors
         category: "NotifyGen",
         defaultSeverity: DiagnosticSeverity.Info,
         isEnabledByDefault: true,
-        description: "NotifyGen only generates properties for instance fields. Static and const fields cannot trigger PropertyChanged events because they are shared across instances.");
+        description: "NotifyGen only generates properties for instance fields. Static and const fields cannot trigger PropertyChanged events because they are shared across instances."
+    );
 
     /// <summary>
     /// NOTIFY005: Readonly field cannot generate a property with a setter.
@@ -65,5 +69,19 @@ internal static class DiagnosticDescriptors
         category: "NotifyGen",
         defaultSeverity: DiagnosticSeverity.Info,
         isEnabledByDefault: true,
-        description: "Readonly fields cannot be modified after initialization, so a property setter cannot be generated. Consider making the field mutable or using a computed property instead.");
+        description: "Readonly fields cannot be modified after initialization, so a property setter cannot be generated. Consider making the field mutable or using a computed property instead."
+    );
+
+    /// <summary>
+    /// NOTIFY006: A containing type of a notified nested class must be partial.
+    /// </summary>
+    public static readonly DiagnosticDescriptor ContainingTypeMustBePartial = new(
+        id: "NOTIFY006",
+        title: "Containing type is not partial",
+        messageFormat: "Containing type '{0}' must be partial so NotifyGen can generate members for nested class '{1}'",
+        category: "NotifyGen",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Every type containing a nested class marked with [Notify] must be partial so the source generator can reopen the complete declaration chain."
+    );
 }

@@ -23,7 +23,8 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.NoEligibleFields,
             DiagnosticDescriptors.UnknownNotifyAlsoProperty,
             DiagnosticDescriptors.StaticOrConstField,
-            DiagnosticDescriptors.ReadonlyField
+            DiagnosticDescriptors.ReadonlyField,
+            DiagnosticDescriptors.ContainingTypeMustBePartial
         );
 
     public override void Initialize(AnalysisContext context)
@@ -64,6 +65,30 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                 classSymbol.Name
             );
             context.ReportDiagnostic(diagnostic);
+            return;
+        }
+
+        var nonPartialContainingDeclaration = classDeclaration
+            .Ancestors()
+            .OfType<TypeDeclarationSyntax>()
+            .FirstOrDefault(static declaration =>
+                !declaration.Modifiers.Any(SyntaxKind.PartialKeyword)
+            );
+        if (nonPartialContainingDeclaration != null)
+        {
+            var containingTypeSymbol = context.SemanticModel.GetDeclaredSymbol(
+                nonPartialContainingDeclaration,
+                context.CancellationToken
+            );
+            context.ReportDiagnostic(
+                Diagnostic.Create(
+                    DiagnosticDescriptors.ContainingTypeMustBePartial,
+                    nonPartialContainingDeclaration.Identifier.GetLocation(),
+                    containingTypeSymbol?.Name
+                        ?? nonPartialContainingDeclaration.Identifier.ValueText,
+                    classSymbol.Name
+                )
+            );
             return;
         }
 

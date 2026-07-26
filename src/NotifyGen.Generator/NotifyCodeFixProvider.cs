@@ -18,45 +18,52 @@ namespace NotifyGen.Generator;
 [Shared]
 public sealed class NotifyCodeFixProvider : CodeFixProvider
 {
-    private const string Title = "Make class partial";
+    private const string Title = "Make type partial";
 
     public override ImmutableArray<string> FixableDiagnosticIds =>
-        ImmutableArray.Create(DiagnosticDescriptors.ClassMustBePartial.Id);
+        ImmutableArray.Create(
+            DiagnosticDescriptors.ClassMustBePartial.Id,
+            DiagnosticDescriptors.ContainingTypeMustBePartial.Id
+        );
 
     public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
-        var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
+        var root = await context
+            .Document.GetSyntaxRootAsync(context.CancellationToken)
+            .ConfigureAwait(false);
         if (root == null)
             return;
 
         var diagnostic = context.Diagnostics.First();
         var diagnosticSpan = diagnostic.Location.SourceSpan;
 
-        // Find the class declaration at the diagnostic location
-        var classDeclaration = root.FindToken(diagnosticSpan.Start)
-            .Parent?
-            .AncestorsAndSelf()
-            .OfType<ClassDeclarationSyntax>()
+        // Find the type declaration named by the diagnostic.
+        var typeDeclaration = root.FindToken(diagnosticSpan.Start)
+            .Parent?.AncestorsAndSelf()
+            .OfType<TypeDeclarationSyntax>()
             .FirstOrDefault();
 
-        if (classDeclaration == null)
+        if (typeDeclaration == null)
             return;
 
-        // Register a code action that adds the partial modifier
         context.RegisterCodeFix(
             CodeAction.Create(
                 title: Title,
-                createChangedDocument: ct => AddPartialModifierAsync(context.Document, classDeclaration, ct),
-                equivalenceKey: Title),
-            diagnostic);
+                createChangedDocument: ct =>
+                    AddPartialModifierAsync(context.Document, typeDeclaration, ct),
+                equivalenceKey: Title
+            ),
+            diagnostic
+        );
     }
 
     private static async Task<Document> AddPartialModifierAsync(
         Document document,
-        ClassDeclarationSyntax classDeclaration,
-        CancellationToken cancellationToken)
+        TypeDeclarationSyntax typeDeclaration,
+        CancellationToken cancellationToken
+    )
     {
         var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
         if (root == null)
@@ -67,14 +74,15 @@ public sealed class NotifyCodeFixProvider : CodeFixProvider
 
         // Find the position to insert the partial keyword
         // It should go before the 'class' keyword but after access modifiers
-        var modifiers = classDeclaration.Modifiers;
+        var modifiers = typeDeclaration.Modifiers;
         SyntaxTokenList newModifiers;
 
         if (modifiers.Count == 0)
         {
             // No modifiers, just add partial with trailing space
             newModifiers = SyntaxFactory.TokenList(
-                partialKeyword.WithTrailingTrivia(SyntaxFactory.Space));
+                partialKeyword.WithTrailingTrivia(SyntaxFactory.Space)
+            );
         }
         else
         {
@@ -82,8 +90,7 @@ public sealed class NotifyCodeFixProvider : CodeFixProvider
             var lastModifier = modifiers.Last();
 
             // The new partial keyword takes the trailing trivia from the last modifier
-            var newPartial = partialKeyword
-                .WithTrailingTrivia(lastModifier.TrailingTrivia);
+            var newPartial = partialKeyword.WithTrailingTrivia(lastModifier.TrailingTrivia);
 
             // Update the last modifier to have just a single space as trailing trivia
             var updatedLastModifier = lastModifier.WithTrailingTrivia(SyntaxFactory.Space);
@@ -95,11 +102,8 @@ public sealed class NotifyCodeFixProvider : CodeFixProvider
             newModifiers = SyntaxFactory.TokenList(modifiersList);
         }
 
-        // Create the new class declaration with the partial modifier
-        var newClassDeclaration = classDeclaration.WithModifiers(newModifiers);
-
-        // Replace the old class declaration with the new one
-        var newRoot = root.ReplaceNode(classDeclaration, newClassDeclaration);
+        var newTypeDeclaration = typeDeclaration.WithModifiers(newModifiers);
+        var newRoot = root.ReplaceNode(typeDeclaration, newTypeDeclaration);
         return document.WithSyntaxRoot(newRoot);
     }
 }
