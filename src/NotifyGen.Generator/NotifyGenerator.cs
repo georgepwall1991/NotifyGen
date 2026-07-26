@@ -578,8 +578,14 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         var setterModifier = field.SetterAccess != null ? $"{field.SetterAccess} " : "";
         sb.AppendLine($"{indent}        {setterModifier}set");
         sb.AppendLine($"{indent}        {{");
-        // Use direct == for primitive types (faster), EqualityComparer for complex types
-        if (field.IsPrimitiveType)
+        // Pointer-like types use native-int equality to avoid function-pointer comparison warnings.
+        if (field.IsPrimitiveType && field.RequiresUnsafe)
+        {
+            sb.AppendLine(
+                $"{indent}            if ((nint){field.FieldName} == (nint)value) return;"
+            );
+        }
+        else if (field.IsPrimitiveType)
         {
             sb.AppendLine($"{indent}            if ({field.FieldName} == value) return;");
         }

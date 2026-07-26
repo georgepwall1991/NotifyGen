@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generated declarations preserve accessibility, required modifiers, generic parameters, and escaped identifiers while remaining compatible with constrained generic chains
 - Source hint names are collision-safe across nested types, same simple names, case-folding file systems, and long metadata identities
 - Non-partial containing chains now report every blocking declaration and withhold generation instead of producing malformed nested output
-- Unsafe declaration contexts and member-scoped pointer or function-pointer fields now generate compilable code with direct equality guards
+- Unsafe declaration contexts and member-scoped pointer or function-pointer fields now generate compilable code with warning-free native-integer equality guards
 - `[NotifyAlso]` validation no longer treats ineligible fields as future generated properties, so missing references produce `NOTIFY003`
 
 ### For contributors

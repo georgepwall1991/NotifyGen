@@ -804,7 +804,7 @@ public class EdgeCaseTests
             }
             """;
 
-        var (_, _, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(
+        var (outputCompilation, _, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(
             source,
             allowUnsafe: true
         );
@@ -813,6 +813,11 @@ public class EdgeCaseTests
             .GeneratedSources.Single()
             .SourceText.ToString();
 
+        outputCompilation
+            .GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Warning)
+            .Should()
+            .BeEmpty("valid generated unsafe members should compile without warnings");
         generatedSource.Should().Contain("public unsafe partial class Model");
         generatedSource.Should().Contain($"public {fieldType} Value");
     }
