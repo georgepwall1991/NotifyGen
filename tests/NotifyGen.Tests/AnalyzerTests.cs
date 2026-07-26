@@ -355,6 +355,32 @@ public class AnalyzerTests
     }
 
     [Fact]
+    public void Generator_NonPartialTarget_EmitsNoSource()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public class Person
+                {
+                    private string _name;
+                }
+            }
+            """;
+
+        var (outputCompilation, _, runResult) = GeneratorTestHelper.RunGenerator(source);
+
+        outputCompilation
+            .GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Should()
+            .BeEmpty();
+        runResult.Results.Single().GeneratedSources.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Analyzer_NonPartialContainingType_ReportsSingleError()
     {
         var source = """
