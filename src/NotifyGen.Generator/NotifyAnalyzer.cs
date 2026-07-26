@@ -24,7 +24,8 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.UnknownNotifyAlsoProperty,
             DiagnosticDescriptors.StaticOrConstField,
             DiagnosticDescriptors.ReadonlyField,
-            DiagnosticDescriptors.ContainingTypeMustBePartial
+            DiagnosticDescriptors.ContainingTypeMustBePartial,
+            DiagnosticDescriptors.FileLocalTypeNotSupported
         );
 
     public override void Initialize(AnalysisContext context)
@@ -54,6 +55,18 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         if (!hasNotifyAttribute)
             return;
 
+        if (classDeclaration.Modifiers.Any(SyntaxKind.FileKeyword))
+        {
+            context.ReportDiagnostic(
+                Diagnostic.Create(
+                    DiagnosticDescriptors.FileLocalTypeNotSupported,
+                    classDeclaration.Identifier.GetLocation(),
+                    classSymbol.Name
+                )
+            );
+            return;
+        }
+
         // Check if class is partial
         var isPartial = classDeclaration.Modifiers.Any(SyntaxKind.PartialKeyword);
 
@@ -68,20 +81,33 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        var hasNonPartialContainingType = false;
+        var hasInvalidContainingType = false;
         foreach (
             var containingDeclaration in classDeclaration
                 .Ancestors()
                 .OfType<TypeDeclarationSyntax>()
         )
         {
-            if (containingDeclaration.Modifiers.Any(SyntaxKind.PartialKeyword))
-                continue;
-
             var containingTypeSymbol = context.SemanticModel.GetDeclaredSymbol(
                 containingDeclaration,
                 context.CancellationToken
             );
+            if (containingDeclaration.Modifiers.Any(SyntaxKind.FileKeyword))
+            {
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.FileLocalTypeNotSupported,
+                        containingDeclaration.Identifier.GetLocation(),
+                        containingTypeSymbol?.Name ?? containingDeclaration.Identifier.ValueText
+                    )
+                );
+                hasInvalidContainingType = true;
+                continue;
+            }
+
+            if (containingDeclaration.Modifiers.Any(SyntaxKind.PartialKeyword))
+                continue;
+
             context.ReportDiagnostic(
                 Diagnostic.Create(
                     DiagnosticDescriptors.ContainingTypeMustBePartial,
@@ -90,10 +116,10 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                     classSymbol.Name
                 )
             );
-            hasNonPartialContainingType = true;
+            hasInvalidContainingType = true;
         }
 
-        if (hasNonPartialContainingType)
+        if (hasInvalidContainingType)
             return;
 
         // Analyze fields for eligibility and report specific issues

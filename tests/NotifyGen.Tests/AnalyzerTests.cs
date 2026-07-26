@@ -474,6 +474,90 @@ public class AnalyzerTests
     }
 
     [Fact]
+    public async Task Analyzer_FileLocalTarget_ReportsError()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            file partial class Person
+            {
+                private string _name;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = diagnostics.Should().ContainSingle().Subject;
+        diagnostic.Id.Should().Be("NOTIFY007");
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Error);
+        SourceText.From(source).ToString(diagnostic.Location.SourceSpan).Should().Be("Person");
+    }
+
+    [Fact]
+    public void Generator_FileLocalTarget_EmitsNoSource()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            file partial class Person
+            {
+                private string _name;
+            }
+            """;
+
+        var (_, _, runResult) = GeneratorTestHelper.RunGenerator(source);
+
+        runResult.Results.Single().GeneratedSources.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Analyzer_FileLocalContainingType_ReportsError()
+    {
+        var source = """
+            using NotifyGen;
+
+            file partial class Outer
+            {
+                [Notify]
+                public partial class Inner
+                {
+                    private string _name;
+                }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = diagnostics.Should().ContainSingle().Subject;
+        diagnostic.Id.Should().Be("NOTIFY007");
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Error);
+        SourceText.From(source).ToString(diagnostic.Location.SourceSpan).Should().Be("Outer");
+    }
+
+    [Fact]
+    public void Generator_FileLocalContainingType_EmitsNoSource()
+    {
+        var source = """
+            using NotifyGen;
+
+            file partial class Outer
+            {
+                [Notify]
+                public partial class Inner
+                {
+                    private string _name;
+                }
+            }
+            """;
+
+        var (_, _, runResult) = GeneratorTestHelper.RunGenerator(source);
+
+        runResult.Results.Single().GeneratedSources.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task CodeFix_NonPartialContainingType_AddsPartialToContainer()
     {
         var source = """

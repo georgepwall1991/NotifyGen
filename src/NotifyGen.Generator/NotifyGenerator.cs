@@ -279,6 +279,9 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     /// </summary>
     private static bool IsPrimitiveValueType(ITypeSymbol type)
     {
+        if (type.TypeKind is TypeKind.Pointer or TypeKind.FunctionPointer)
+            return true;
+
         // Handle Nullable<T> - get the underlying type
         if (
             type is INamedTypeSymbol namedType

@@ -84,4 +84,17 @@ internal static class DiagnosticDescriptors
         isEnabledByDefault: true,
         description: "Every type containing a nested class marked with [Notify] must be partial so the source generator can reopen the complete declaration chain."
     );
+
+    /// <summary>
+    /// NOTIFY007: File-local types cannot be extended from generated source.
+    /// </summary>
+    public static readonly DiagnosticDescriptor FileLocalTypeNotSupported = new(
+        id: "NOTIFY007",
+        title: "File-local type is not supported",
+        messageFormat: "Type '{0}' uses file accessibility and cannot participate in NotifyGen generation because generated source is emitted in a separate file",
+        category: "NotifyGen",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "File-local types are visible only within their declaring source file, so a source generator cannot add a partial declaration from a generated file."
+    );
 }

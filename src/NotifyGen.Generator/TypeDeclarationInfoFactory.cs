@@ -36,6 +36,12 @@ internal static class TypeDeclarationInfoFactory
                 return false;
             }
 
+            if (declaration.Modifiers.Any(SyntaxKind.FileKeyword))
+            {
+                declarations = ImmutableArray<TypeDeclarationInfo>.Empty;
+                return false;
+            }
+
             var typeParameters = declaration.TypeParameterList is { } typeParameterList
                 ? typeParameterList.Parameters.Select(GetTypeParameterSource).ToImmutableArray()
                 : ImmutableArray<string>.Empty;
@@ -96,7 +102,8 @@ internal static class TypeDeclarationInfoFactory
         || token.IsKind(SyntaxKind.AbstractKeyword)
         || token.IsKind(SyntaxKind.SealedKeyword)
         || token.IsKind(SyntaxKind.ReadOnlyKeyword)
-        || token.IsKind(SyntaxKind.RefKeyword);
+        || token.IsKind(SyntaxKind.RefKeyword)
+        || token.IsKind(SyntaxKind.UnsafeKeyword);
 
     private static string GetAccessibility(Accessibility accessibility) =>
         accessibility switch

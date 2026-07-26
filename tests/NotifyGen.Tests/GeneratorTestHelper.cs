@@ -35,7 +35,7 @@ public static class GeneratorTestHelper
         Compilation OutputCompilation,
         ImmutableArray<Diagnostic> Diagnostics,
         GeneratorDriverRunResult RunResult
-    ) RunGenerator(string source)
+    ) RunGenerator(string source, bool allowUnsafe = false)
     {
         // Create syntax tree
         var syntaxTree = CSharpSyntaxTree.ParseText(source);
@@ -47,9 +47,9 @@ public static class GeneratorTestHelper
             "TestAssembly",
             new[] { syntaxTree },
             references,
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary
-            ).WithNullableContextOptions(NullableContextOptions.Enable)
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+                .WithNullableContextOptions(NullableContextOptions.Enable)
+                .WithAllowUnsafe(allowUnsafe)
         );
 
         // Create generator driver
@@ -74,9 +74,9 @@ public static class GeneratorTestHelper
         Compilation OutputCompilation,
         ImmutableArray<Diagnostic> Diagnostics,
         GeneratorDriverRunResult RunResult
-    ) RunGeneratorAndAssertCompiles(string source)
+    ) RunGeneratorAndAssertCompiles(string source, bool allowUnsafe = false)
     {
-        var result = RunGenerator(source);
+        var result = RunGenerator(source, allowUnsafe);
         var errors = result
             .OutputCompilation.GetDiagnostics()
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)

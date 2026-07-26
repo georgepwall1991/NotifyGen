@@ -129,9 +129,13 @@ Report each non-partial container that blocks generation. Emit no source for the
 
 Extend the existing make-partial code-fix path to support `NOTIFY006`; do not add a separate fixer implementation.
 
+### New File-Local-Type Diagnostic
+
+Add `NOTIFY007` as an error for a notified target or containing type declared with file-local accessibility. Locate the diagnostic on the file-local declaration and emit no source for the target because generated partial declarations cannot access file-local types from a separate source file.
+
 ### Modeling Failures
 
-A legal supported declaration graph is a total modeling case and must produce a complete model. Known source-shape failures (`NOTIFY001` and `NOTIFY006`) are detected by the analyzer; the generator consumes the same validity result, emits nothing for the invalid target, and does not report duplicate diagnostics.
+A legal supported declaration graph is a total modeling case and must produce a complete model. Known source-shape failures (`NOTIFY001`, `NOTIFY006`, and `NOTIFY007`) are detected by the analyzer; the generator consumes the same validity result, emits nothing for the invalid target, and does not report duplicate diagnostics.
 
 Incomplete or error symbols from an already-invalid compilation are skipped without malformed fallback output. Unexpected implementation exceptions are not swallowed. This keeps user-actionable diagnostics authoritative while ensuring valid nested targets cannot be silently flattened.
 
@@ -146,10 +150,11 @@ Add failing tests before implementation for:
 1. readonly underscore fields causing output-compilation errors;
 2. static and const fields being admitted by generation;
 3. a notified class nested in a partial class being flattened;
-4. deep generic containing chains losing declaration shape;
-5. same simple names producing colliding source hints;
-6. non-partial containers lacking an actionable diagnostic;
-7. the make-partial code fix not handling a containing type.
+4. file-local notified targets or containing types causing inaccessible generated declarations;
+5. deep generic containing chains losing declaration shape;
+6. same simple names producing colliding source hints;
+7. non-partial containers lacking an actionable diagnostic;
+8. the make-partial code fix not handling a containing type.
 
 ### Supported Shapes
 

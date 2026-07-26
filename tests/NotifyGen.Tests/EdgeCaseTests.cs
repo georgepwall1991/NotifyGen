@@ -755,6 +755,38 @@ public class EdgeCaseTests
     }
 
     [Fact]
+    public void Generator_WithUnsafeContainingType_PreservesUnsafeContext()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                public unsafe partial class Container
+                {
+                    [Notify]
+                    public partial class Inner
+                    {
+                        private int* _value;
+                    }
+                }
+            }
+            """;
+
+        var (_, _, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(
+            source,
+            allowUnsafe: true
+        );
+        var generatedSource = runResult
+            .Results.Single()
+            .GeneratedSources.Single()
+            .SourceText.ToString();
+
+        generatedSource.Should().Contain("public unsafe partial class Container");
+        generatedSource.Should().Contain("public int* Value");
+    }
+
+    [Fact]
     public void Generator_WithGenericContainingType_PreservesDeclarationShape()
     {
         var source = """
