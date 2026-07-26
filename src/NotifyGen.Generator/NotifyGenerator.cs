@@ -19,11 +19,11 @@ namespace NotifyGen.Generator;
 public sealed class NotifyGenerator : IIncrementalGenerator
 {
     private const string NotifyAttributeName = "NotifyGen.NotifyAttribute";
-    private const string NotifyIgnoreAttributeName = "NotifyGen.NotifyIgnoreAttribute";
     private const string NotifyAlsoAttributeName = "NotifyGen.NotifyAlsoAttribute";
     private const string NotifyNameAttributeName = "NotifyGen.NotifyNameAttribute";
     private const string NotifySetterAttributeName = "NotifyGen.NotifySetterAttribute";
-    private const string NotifyCanExecuteChangedForAttributeName = "NotifyGen.NotifyCanExecuteChangedForAttribute";
+    private const string NotifyCanExecuteChangedForAttributeName =
+        "NotifyGen.NotifyCanExecuteChangedForAttribute";
     private const string NotifySuppressableAttributeName = "NotifyGen.NotifySuppressableAttribute";
 
     /// <summary>
@@ -34,15 +34,17 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
         genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
         miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes
-            | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+            | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier
+    );
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         // Find all class declarations with [Notify] attribute
-        var classDeclarations = context.SyntaxProvider
-            .CreateSyntaxProvider(
+        var classDeclarations = context
+            .SyntaxProvider.CreateSyntaxProvider(
                 predicate: static (node, _) => IsCandidateClass(node),
-                transform: static (ctx, ct) => GetClassInfo(ctx, ct))
+                transform: static (ctx, ct) => GetClassInfo(ctx, ct)
+            )
             .Where(static info => info.HasValue)
             .Select(static (info, _) => info!.Value);
 
@@ -73,20 +75,26 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             return null;
 
         // Check if it has [Notify] attribute
-        var notifyAttribute = classSymbol.GetAttributes()
+        var notifyAttribute = classSymbol
+            .GetAttributes()
             .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifyAttributeName);
 
         if (notifyAttribute == null)
             return null;
 
         // Check for ImplementChanging property on the attribute
-        var implementChanging = notifyAttribute.NamedArguments
-            .FirstOrDefault(a => a.Key == "ImplementChanging")
-            .Value.Value is true;
+        var implementChanging =
+            notifyAttribute
+                .NamedArguments.FirstOrDefault(a => a.Key == "ImplementChanging")
+                .Value.Value
+            is true;
 
         // Check for [NotifySuppressable] attribute and extract AlwaysNotify property
-        var suppressableAttribute = classSymbol.GetAttributes()
-            .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifySuppressableAttributeName);
+        var suppressableAttribute = classSymbol
+            .GetAttributes()
+            .FirstOrDefault(a =>
+                a.AttributeClass?.ToDisplayString() == NotifySuppressableAttributeName
+            );
 
         var isSuppressable = suppressableAttribute != null;
         var alwaysNotifyProperties = ImmutableArray<string>.Empty;
@@ -94,13 +102,14 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         if (suppressableAttribute != null)
         {
             // Extract AlwaysNotify property from the attribute
-            var alwaysNotifyArg = suppressableAttribute.NamedArguments
-                .FirstOrDefault(a => a.Key == "AlwaysNotify");
+            var alwaysNotifyArg = suppressableAttribute.NamedArguments.FirstOrDefault(a =>
+                a.Key == "AlwaysNotify"
+            );
 
             if (alwaysNotifyArg.Value.Kind == TypedConstantKind.Array)
             {
-                alwaysNotifyProperties = alwaysNotifyArg.Value.Values
-                    .Where(v => v.Value is string)
+                alwaysNotifyProperties = alwaysNotifyArg
+                    .Value.Values.Where(v => v.Value is string)
                     .Select(v => (string)v.Value!)
                     .ToImmutableArray();
             }
@@ -108,15 +117,22 @@ public sealed class NotifyGenerator : IIncrementalGenerator
 
         // Check if already implements INotifyPropertyChanged
         var inpcInterface = semanticModel.Compilation.GetTypeByMetadataName(
-            "System.ComponentModel.INotifyPropertyChanged");
-        var alreadyImplementsInpc = inpcInterface != null
+            "System.ComponentModel.INotifyPropertyChanged"
+        );
+        var alreadyImplementsInpc =
+            inpcInterface != null
             && classSymbol.AllInterfaces.Contains(inpcInterface, SymbolEqualityComparer.Default);
 
         // Check if already implements INotifyPropertyChanging
         var inpcChangingInterface = semanticModel.Compilation.GetTypeByMetadataName(
-            "System.ComponentModel.INotifyPropertyChanging");
-        var alreadyImplementsInpcChanging = inpcChangingInterface != null
-            && classSymbol.AllInterfaces.Contains(inpcChangingInterface, SymbolEqualityComparer.Default);
+            "System.ComponentModel.INotifyPropertyChanging"
+        );
+        var alreadyImplementsInpcChanging =
+            inpcChangingInterface != null
+            && classSymbol.AllInterfaces.Contains(
+                inpcChangingInterface,
+                SymbolEqualityComparer.Default
+            );
 
         // Extract field information
         var fields = ExtractFields(classSymbol, ct);
@@ -130,19 +146,19 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             Accessibility.Private => "private",
             Accessibility.ProtectedOrInternal => "protected internal",
             Accessibility.ProtectedAndInternal => "private protected",
-            _ => "internal"
+            _ => "internal",
         };
 
         // Get namespace (check for global namespace)
         var ns = classSymbol.ContainingNamespace;
-        var namespaceName = ns != null && !ns.IsGlobalNamespace
-            ? ns.ToDisplayString()
-            : string.Empty;
+        var namespaceName =
+            ns != null && !ns.IsGlobalNamespace ? ns.ToDisplayString() : string.Empty;
 
         // Get type parameters for generic classes
-        var typeParameters = classSymbol.TypeParameters.Length > 0
-            ? "<" + string.Join(", ", classSymbol.TypeParameters.Select(tp => tp.Name)) + ">"
-            : string.Empty;
+        var typeParameters =
+            classSymbol.TypeParameters.Length > 0
+                ? "<" + string.Join(", ", classSymbol.TypeParameters.Select(tp => tp.Name)) + ">"
+                : string.Empty;
 
         return new ClassInfo(
             namespaceName,
@@ -154,43 +170,30 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             implementChanging,
             isSuppressable,
             alwaysNotifyProperties,
-            fields);
+            fields
+        );
     }
 
     /// <summary>
     /// Extracts field information from the class.
     /// </summary>
-    private static ImmutableArray<FieldInfo> ExtractFields(INamedTypeSymbol classSymbol, CancellationToken ct)
+    private static ImmutableArray<FieldInfo> ExtractFields(
+        INamedTypeSymbol classSymbol,
+        CancellationToken ct
+    )
     {
-        return classSymbol.GetMembers()
+        return classSymbol
+            .GetMembers()
             .OfType<IFieldSymbol>()
-            .Where(IsEligibleField)
+            .Where(static field =>
+                FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible
+            )
             .Select(f =>
             {
                 ct.ThrowIfCancellationRequested();
                 return CreateFieldInfo(f);
             })
             .ToImmutableArray();
-    }
-
-    /// <summary>
-    /// Determines if a field is eligible for property generation.
-    /// </summary>
-    private static bool IsEligibleField(IFieldSymbol field)
-    {
-        // Only private fields
-        if (field.DeclaredAccessibility != Accessibility.Private)
-            return false;
-
-        // Must start with underscore and have at least 2 characters
-        if (!field.Name.StartsWith("_", StringComparison.Ordinal) || field.Name.Length < 2)
-            return false;
-
-        // Check for [NotifyIgnore]
-        if (HasAttribute(field, NotifyIgnoreAttributeName))
-            return false;
-
-        return true;
     }
 
     /// <summary>
@@ -214,15 +217,8 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             alsoNotify,
             commandsToNotify,
             setterAccess,
-            isPrimitiveType);
-    }
-
-    /// <summary>
-    /// Checks if a field has a specific attribute.
-    /// </summary>
-    private static bool HasAttribute(IFieldSymbol field, string attributeName)
-    {
-        return field.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == attributeName);
+            isPrimitiveType
+        );
     }
 
     /// <summary>
@@ -231,7 +227,8 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     private static string GetPropertyName(IFieldSymbol field)
     {
         // Get property name from [NotifyName] or derive from field name (_name -> Name)
-        var notifyNameAttr = field.GetAttributes()
+        var notifyNameAttr = field
+            .GetAttributes()
             .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifyNameAttributeName);
 
         if (notifyNameAttr?.ConstructorArguments.FirstOrDefault().Value is string customName)
@@ -246,16 +243,22 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     private static bool IsNullableType(ITypeSymbol type)
     {
         return type.NullableAnnotation == NullableAnnotation.Annotated
-            || (type is INamedTypeSymbol namedType
-                && namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T);
+            || (
+                type is INamedTypeSymbol namedType
+                && namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T
+            );
     }
 
     /// <summary>
     /// Extracts string values from multiple instances of an attribute.
     /// </summary>
-    private static ImmutableArray<string> GetAttributeValues(IFieldSymbol field, string attributeName)
+    private static ImmutableArray<string> GetAttributeValues(
+        IFieldSymbol field,
+        string attributeName
+    )
     {
-        return field.GetAttributes()
+        return field
+            .GetAttributes()
             .Where(a => a.AttributeClass?.ToDisplayString() == attributeName)
             .Select(a => a.ConstructorArguments.FirstOrDefault().Value as string)
             .Where(s => !string.IsNullOrEmpty(s))
@@ -268,7 +271,8 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     /// </summary>
     private static string? GetSetterAccessLevel(IFieldSymbol field)
     {
-        var setterAttr = field.GetAttributes()
+        var setterAttr = field
+            .GetAttributes()
             .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifySetterAttributeName);
 
         if (setterAttr == null || setterAttr.ConstructorArguments.Length == 0)
@@ -283,7 +287,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             3 => "private",
             4 => "protected internal",
             5 => "private protected",
-            _ => null
+            _ => null,
         };
     }
 
@@ -293,29 +297,32 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     private static bool IsPrimitiveValueType(ITypeSymbol type)
     {
         // Handle Nullable<T> - get the underlying type
-        if (type is INamedTypeSymbol namedType &&
-            namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+        if (
+            type is INamedTypeSymbol namedType
+            && namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T
+        )
         {
             type = namedType.TypeArguments[0];
         }
 
-        return type.IsValueType && type.SpecialType switch
-        {
-            SpecialType.System_Boolean => true,
-            SpecialType.System_Char => true,
-            SpecialType.System_SByte => true,
-            SpecialType.System_Byte => true,
-            SpecialType.System_Int16 => true,
-            SpecialType.System_UInt16 => true,
-            SpecialType.System_Int32 => true,
-            SpecialType.System_UInt32 => true,
-            SpecialType.System_Int64 => true,
-            SpecialType.System_UInt64 => true,
-            SpecialType.System_Single => true,
-            SpecialType.System_Double => true,
-            SpecialType.System_Decimal => true,
-            _ => false
-        };
+        return type.IsValueType
+            && type.SpecialType switch
+            {
+                SpecialType.System_Boolean => true,
+                SpecialType.System_Char => true,
+                SpecialType.System_SByte => true,
+                SpecialType.System_Byte => true,
+                SpecialType.System_Int16 => true,
+                SpecialType.System_UInt16 => true,
+                SpecialType.System_Int32 => true,
+                SpecialType.System_UInt32 => true,
+                SpecialType.System_Int64 => true,
+                SpecialType.System_UInt64 => true,
+                SpecialType.System_Single => true,
+                SpecialType.System_Double => true,
+                SpecialType.System_Decimal => true,
+                _ => false,
+            };
     }
 
     /// <summary>
@@ -353,20 +360,26 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         if (classInfo.ImplementChanging && !classInfo.AlreadyImplementsInpcChanging)
             interfaceList.Add("INotifyPropertyChanging");
         var interfaces = interfaceList.Count > 0 ? " : " + string.Join(", ", interfaceList) : "";
-        sb.AppendLine($"{indent}{classInfo.Accessibility} partial class {classInfo.ClassName}{classInfo.TypeParameters}{interfaces}");
+        sb.AppendLine(
+            $"{indent}{classInfo.Accessibility} partial class {classInfo.ClassName}{classInfo.TypeParameters}{interfaces}"
+        );
         sb.AppendLine($"{indent}{{");
 
         // PropertyChanged event (only if not already implemented)
         if (!classInfo.AlreadyImplementsInpc)
         {
-            sb.AppendLine($"{indent}    public event PropertyChangedEventHandler? PropertyChanged;");
+            sb.AppendLine(
+                $"{indent}    public event PropertyChangedEventHandler? PropertyChanged;"
+            );
             sb.AppendLine();
         }
 
         // PropertyChanging event (only if ImplementChanging is true and not already implemented)
         if (classInfo.ImplementChanging && !classInfo.AlreadyImplementsInpcChanging)
         {
-            sb.AppendLine($"{indent}    public event PropertyChangingEventHandler? PropertyChanging;");
+            sb.AppendLine(
+                $"{indent}    public event PropertyChangingEventHandler? PropertyChanging;"
+            );
             sb.AppendLine();
         }
 
@@ -376,7 +389,9 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             // Generate static HashSet for AlwaysNotify properties
             if (classInfo.AlwaysNotifyProperties.Length > 0)
             {
-                sb.AppendLine($"{indent}    private static readonly HashSet<string> _neverSuppressedProperties = new()");
+                sb.AppendLine(
+                    $"{indent}    private static readonly HashSet<string> _neverSuppressedProperties = new()"
+                );
                 sb.AppendLine($"{indent}    {{");
                 foreach (var prop in classInfo.AlwaysNotifyProperties)
                 {
@@ -401,26 +416,34 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         // OnPropertyChanged method (only if not already implemented)
         if (!classInfo.AlreadyImplementsInpc)
         {
-            sb.AppendLine($"{indent}    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)");
+            sb.AppendLine(
+                $"{indent}    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)"
+            );
             sb.AppendLine($"{indent}    {{");
             if (classInfo.IsSuppressable)
             {
                 if (classInfo.AlwaysNotifyProperties.Length > 0)
                 {
                     // Check if property should never be suppressed
-                    sb.AppendLine($"{indent}        if (_notificationSuppressionCount > 0 && !_neverSuppressedProperties.Contains(propertyName ?? \"\"))");
+                    sb.AppendLine(
+                        $"{indent}        if (_notificationSuppressionCount > 0 && !_neverSuppressedProperties.Contains(propertyName ?? \"\"))"
+                    );
                 }
                 else
                 {
                     sb.AppendLine($"{indent}        if (_notificationSuppressionCount > 0)");
                 }
                 sb.AppendLine($"{indent}        {{");
-                sb.AppendLine($"{indent}            _pendingNotifications ??= new HashSet<string>();");
+                sb.AppendLine(
+                    $"{indent}            _pendingNotifications ??= new HashSet<string>();"
+                );
                 sb.AppendLine($"{indent}            _pendingNotifications.Add(propertyName!);");
                 sb.AppendLine($"{indent}            return;");
                 sb.AppendLine($"{indent}        }}");
             }
-            sb.AppendLine($"{indent}        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));");
+            sb.AppendLine(
+                $"{indent}        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));"
+            );
             sb.AppendLine($"{indent}    }}");
             sb.AppendLine();
         }
@@ -428,9 +451,13 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         // OnPropertyChanging method (only if ImplementChanging is true and not already implemented)
         if (classInfo.ImplementChanging && !classInfo.AlreadyImplementsInpcChanging)
         {
-            sb.AppendLine($"{indent}    protected virtual void OnPropertyChanging([CallerMemberName] string? propertyName = null)");
+            sb.AppendLine(
+                $"{indent}    protected virtual void OnPropertyChanging([CallerMemberName] string? propertyName = null)"
+            );
             sb.AppendLine($"{indent}    {{");
-            sb.AppendLine($"{indent}        PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(propertyName));");
+            sb.AppendLine(
+                $"{indent}        PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(propertyName));"
+            );
             sb.AppendLine($"{indent}    }}");
             sb.AppendLine();
         }
@@ -438,7 +465,9 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         // Generate partial hooks
         foreach (var field in classInfo.Fields)
         {
-            sb.AppendLine($"{indent}    partial void On{field.PropertyName}Changing({field.TypeName} oldValue, {field.TypeName} newValue);");
+            sb.AppendLine(
+                $"{indent}    partial void On{field.PropertyName}Changing({field.TypeName} oldValue, {field.TypeName} newValue);"
+            );
             sb.AppendLine($"{indent}    partial void On{field.PropertyName}Changed();");
         }
 
@@ -447,7 +476,9 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         {
             sb.AppendLine();
             sb.AppendLine($"{indent}    /// <summary>");
-            sb.AppendLine($"{indent}    /// Suppresses PropertyChanged notifications until the returned IDisposable is disposed.");
+            sb.AppendLine(
+                $"{indent}    /// Suppresses PropertyChanged notifications until the returned IDisposable is disposed."
+            );
             sb.AppendLine($"{indent}    /// Supports nested suppression scopes.");
             sb.AppendLine($"{indent}    /// </summary>");
             sb.AppendLine($"{indent}    public IDisposable SuppressNotifications()");
@@ -458,11 +489,17 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             sb.AppendLine();
             sb.AppendLine($"{indent}    private void ResumeNotifications()");
             sb.AppendLine($"{indent}    {{");
-            sb.AppendLine($"{indent}        if (--_notificationSuppressionCount == 0 && _pendingNotifications != null)");
+            sb.AppendLine(
+                $"{indent}        if (--_notificationSuppressionCount == 0 && _pendingNotifications != null)"
+            );
             sb.AppendLine($"{indent}        {{");
-            sb.AppendLine($"{indent}            foreach (var propertyName in _pendingNotifications)");
+            sb.AppendLine(
+                $"{indent}            foreach (var propertyName in _pendingNotifications)"
+            );
             sb.AppendLine($"{indent}            {{");
-            sb.AppendLine($"{indent}                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));");
+            sb.AppendLine(
+                $"{indent}                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));"
+            );
             sb.AppendLine($"{indent}            }}");
             sb.AppendLine($"{indent}            _pendingNotifications.Clear();");
             sb.AppendLine($"{indent}        }}");
@@ -470,9 +507,15 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             sb.AppendLine();
             sb.AppendLine($"{indent}    private sealed class NotificationSuppressor : IDisposable");
             sb.AppendLine($"{indent}    {{");
-            sb.AppendLine($"{indent}        private readonly {classInfo.ClassName}{classInfo.TypeParameters} _owner;");
-            sb.AppendLine($"{indent}        public NotificationSuppressor({classInfo.ClassName}{classInfo.TypeParameters} owner) => _owner = owner;");
-            sb.AppendLine($"{indent}        public void Dispose() => _owner.ResumeNotifications();");
+            sb.AppendLine(
+                $"{indent}        private readonly {classInfo.ClassName}{classInfo.TypeParameters} _owner;"
+            );
+            sb.AppendLine(
+                $"{indent}        public NotificationSuppressor({classInfo.ClassName}{classInfo.TypeParameters} owner) => _owner = owner;"
+            );
+            sb.AppendLine(
+                $"{indent}        public void Dispose() => _owner.ResumeNotifications();"
+            );
             sb.AppendLine($"{indent}    }}");
         }
 
@@ -490,7 +533,12 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     /// <summary>
     /// Generates a single property.
     /// </summary>
-    private static void GenerateProperty(StringBuilder sb, FieldInfo field, string indent, bool implementChanging)
+    private static void GenerateProperty(
+        StringBuilder sb,
+        FieldInfo field,
+        string indent,
+        bool implementChanging
+    )
     {
         sb.AppendLine($"{indent}    public {field.TypeName} {field.PropertyName}");
         sb.AppendLine($"{indent}    {{");
@@ -505,14 +553,18 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         }
         else
         {
-            sb.AppendLine($"{indent}            if (EqualityComparer<{field.TypeName}>.Default.Equals({field.FieldName}, value)) return;");
+            sb.AppendLine(
+                $"{indent}            if (EqualityComparer<{field.TypeName}>.Default.Equals({field.FieldName}, value)) return;"
+            );
         }
         // Fire PropertyChanging event if enabled
         if (implementChanging)
         {
             sb.AppendLine($"{indent}            OnPropertyChanging();");
         }
-        sb.AppendLine($"{indent}            On{field.PropertyName}Changing({field.FieldName}, value);");
+        sb.AppendLine(
+            $"{indent}            On{field.PropertyName}Changing({field.FieldName}, value);"
+        );
         sb.AppendLine($"{indent}            {field.FieldName} = value;");
         sb.AppendLine($"{indent}            OnPropertyChanged();");
 

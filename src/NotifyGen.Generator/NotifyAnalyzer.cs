@@ -15,7 +15,6 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
 {
     private const string NotifyAttributeName = "NotifyGen.NotifyAttribute";
     private const string NotifyAlsoAttributeName = "NotifyGen.NotifyAlsoAttribute";
-    private const string NotifyIgnoreAttributeName = "NotifyGen.NotifyIgnoreAttribute";
     private const string NotifyNameAttributeName = "NotifyGen.NotifyNameAttribute";
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
@@ -24,7 +23,8 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.NoEligibleFields,
             DiagnosticDescriptors.UnknownNotifyAlsoProperty,
             DiagnosticDescriptors.StaticOrConstField,
-            DiagnosticDescriptors.ReadonlyField);
+            DiagnosticDescriptors.ReadonlyField
+        );
 
     public override void Initialize(AnalysisContext context)
     {
@@ -39,12 +39,15 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         var classDeclaration = (ClassDeclarationSyntax)context.Node;
 
         // Get the class symbol
-        if (context.SemanticModel.GetDeclaredSymbol(classDeclaration, context.CancellationToken)
-            is not INamedTypeSymbol classSymbol)
+        if (
+            context.SemanticModel.GetDeclaredSymbol(classDeclaration, context.CancellationToken)
+            is not INamedTypeSymbol classSymbol
+        )
             return;
 
         // Check if class has [Notify] attribute
-        var hasNotifyAttribute = classSymbol.GetAttributes()
+        var hasNotifyAttribute = classSymbol
+            .GetAttributes()
             .Any(a => a.AttributeClass?.ToDisplayString() == NotifyAttributeName);
 
         if (!hasNotifyAttribute)
@@ -58,7 +61,8 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             var diagnostic = Diagnostic.Create(
                 DiagnosticDescriptors.ClassMustBePartial,
                 classDeclaration.Identifier.GetLocation(),
-                classSymbol.Name);
+                classSymbol.Name
+            );
             context.ReportDiagnostic(diagnostic);
             return;
         }
@@ -73,91 +77,90 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeFieldEligibility(
         SyntaxNodeAnalysisContext context,
         INamedTypeSymbol classSymbol,
-        ClassDeclarationSyntax classDeclaration)
+        ClassDeclarationSyntax classDeclaration
+    )
     {
-        var allFields = classSymbol.GetMembers().OfType<IFieldSymbol>().ToImmutableArray();
         var hasEligibleFields = false;
 
-        foreach (var field in allFields)
+        foreach (var field in classSymbol.GetMembers().OfType<IFieldSymbol>())
         {
-            // Skip fields with [NotifyIgnore]
-            if (field.GetAttributes().Any(a =>
-                a.AttributeClass?.ToDisplayString() == NotifyIgnoreAttributeName))
-                continue;
-
-            // Check if field is eligible
-            var isPrivate = field.DeclaredAccessibility == Accessibility.Private;
-            var hasUnderscore = field.Name.StartsWith("_") && field.Name.Length >= 2;
-            var isInstance = !field.IsStatic && !field.IsConst;
-            var isMutable = !field.IsReadOnly;
-
-            // Report specific issues for fields with underscore prefix
-            if (hasUnderscore && isPrivate)
+            var eligibility = FieldEligibilityClassifier.Classify(field);
+            switch (eligibility)
             {
-                // Report static/const fields
-                if (!isInstance)
-                {
-                    var fieldSyntax = field.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(context.CancellationToken);
-                    var location = fieldSyntax?.GetLocation() ?? classDeclaration.Identifier.GetLocation();
-
-                    var diagnostic = Diagnostic.Create(
-                        DiagnosticDescriptors.StaticOrConstField,
-                        location,
-                        field.Name);
-                    context.ReportDiagnostic(diagnostic);
-                    continue;
-                }
-
-                // Report readonly fields
-                if (!isMutable)
-                {
-                    var fieldSyntax = field.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(context.CancellationToken);
-                    var location = fieldSyntax?.GetLocation() ?? classDeclaration.Identifier.GetLocation();
-
-                    var diagnostic = Diagnostic.Create(
-                        DiagnosticDescriptors.ReadonlyField,
-                        location,
-                        field.Name);
-                    context.ReportDiagnostic(diagnostic);
-                    continue;
-                }
-
-                // This field is eligible
-                hasEligibleFields = true;
+                case FieldEligibility.Eligible:
+                    hasEligibleFields = true;
+                    break;
+                case FieldEligibility.StaticOrConst:
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.StaticOrConstField,
+                            GetFieldLocation(field, classDeclaration, context.CancellationToken),
+                            field.Name
+                        )
+                    );
+                    break;
+                case FieldEligibility.Readonly:
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.ReadonlyField,
+                            GetFieldLocation(field, classDeclaration, context.CancellationToken),
+                            field.Name
+                        )
+                    );
+                    break;
             }
         }
 
-        // If no eligible fields, report NOTIFY002
         if (!hasEligibleFields)
         {
-            var diagnostic = Diagnostic.Create(
-                DiagnosticDescriptors.NoEligibleFields,
-                classDeclaration.Identifier.GetLocation(),
-                classSymbol.Name);
-            context.ReportDiagnostic(diagnostic);
+            context.ReportDiagnostic(
+                Diagnostic.Create(
+                    DiagnosticDescriptors.NoEligibleFields,
+                    classDeclaration.Identifier.GetLocation(),
+                    classSymbol.Name
+                )
+            );
         }
     }
 
-    private static void AnalyzeNotifyAlsoReferences(SyntaxNodeAnalysisContext context, INamedTypeSymbol classSymbol)
+    private static Location GetFieldLocation(
+        IFieldSymbol field,
+        ClassDeclarationSyntax classDeclaration,
+        System.Threading.CancellationToken cancellationToken
+    )
+    {
+        return field
+                .DeclaringSyntaxReferences.FirstOrDefault()
+                ?.GetSyntax(cancellationToken)
+                .GetLocation()
+            ?? classDeclaration.Identifier.GetLocation();
+    }
+
+    private static void AnalyzeNotifyAlsoReferences(
+        SyntaxNodeAnalysisContext context,
+        INamedTypeSymbol classSymbol
+    )
     {
         // Collect all property names that exist or will be generated
-        var existingProperties = classSymbol.GetMembers()
+        var existingProperties = classSymbol
+            .GetMembers()
             .OfType<IPropertySymbol>()
             .Select(p => p.Name)
             .ToImmutableHashSet();
 
         // Collect property names that will be generated from fields (respecting [NotifyName])
-        var generatedProperties = classSymbol.GetMembers()
+        var generatedProperties = classSymbol
+            .GetMembers()
             .OfType<IFieldSymbol>()
-            .Where(f => f.DeclaredAccessibility == Accessibility.Private
-                && f.Name.StartsWith("_")
-                && f.Name.Length >= 2
-                && !f.GetAttributes().Any(a =>
-                    a.AttributeClass?.ToDisplayString() == NotifyIgnoreAttributeName))
+            .Where(static field =>
+                FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible
+            )
             .Select(f =>
             {
                 var notifyNameAttr = f.GetAttributes()
-                    .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifyNameAttributeName);
+                    .FirstOrDefault(a =>
+                        a.AttributeClass?.ToDisplayString() == NotifyNameAttributeName
+                    );
                 return notifyNameAttr?.ConstructorArguments.FirstOrDefault().Value as string
                     ?? char.ToUpperInvariant(f.Name[1]) + f.Name.Substring(2);
             })
@@ -168,7 +171,8 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         // Check each field with [NotifyAlso]
         foreach (var field in classSymbol.GetMembers().OfType<IFieldSymbol>())
         {
-            var notifyAlsoAttributes = field.GetAttributes()
+            var notifyAlsoAttributes = field
+                .GetAttributes()
                 .Where(a => a.AttributeClass?.ToDisplayString() == NotifyAlsoAttributeName);
 
             foreach (var attr in notifyAlsoAttributes)
@@ -186,14 +190,19 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                         DiagnosticDescriptors.UnknownNotifyAlsoProperty,
                         location,
                         field.Name,
-                        propertyName);
+                        propertyName
+                    );
                     context.ReportDiagnostic(diagnostic);
                 }
             }
         }
     }
 
-    private static Location GetAttributeLocation(IFieldSymbol field, AttributeData attribute, System.Threading.CancellationToken ct)
+    private static Location GetAttributeLocation(
+        IFieldSymbol field,
+        AttributeData attribute,
+        System.Threading.CancellationToken ct
+    )
     {
         // Try to get the syntax location of the attribute
         if (attribute.ApplicationSyntaxReference?.GetSyntax(ct) is { } syntax)
