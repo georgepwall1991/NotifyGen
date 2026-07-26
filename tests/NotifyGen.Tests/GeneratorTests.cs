@@ -24,7 +24,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -34,8 +34,12 @@ public class GeneratorTests
         generatedSource.Should().Contain("public partial class Person : INotifyPropertyChanged");
         generatedSource.Should().Contain("public string Name");
         generatedSource.Should().Contain("public int Age");
-        generatedSource.Should().Contain("public event PropertyChangedEventHandler? PropertyChanged");
-        generatedSource.Should().Contain("partial void OnNameChanging(string oldValue, string newValue)");
+        generatedSource
+            .Should()
+            .Contain("public event PropertyChangedEventHandler? PropertyChanged");
+        generatedSource
+            .Should()
+            .Contain("partial void OnNameChanging(string oldValue, string newValue)");
         generatedSource.Should().Contain("partial void OnNameChanged()");
         generatedSource.Should().Contain("partial void OnAgeChanging(int oldValue, int newValue)");
         generatedSource.Should().Contain("partial void OnAgeChanged()");
@@ -59,7 +63,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -76,9 +80,15 @@ public class GeneratorTests
         var propertyChangedIndex = generatedSource.IndexOf("OnPropertyChanged()");
         var changedIndex = generatedSource.IndexOf("OnNameChanged()");
 
-        changingIndex.Should().BeLessThan(assignmentIndex, "OnChanging should be called before assignment");
-        assignmentIndex.Should().BeLessThan(propertyChangedIndex, "assignment should happen before OnPropertyChanged");
-        propertyChangedIndex.Should().BeLessThan(changedIndex, "OnPropertyChanged should be called before OnChanged");
+        changingIndex
+            .Should()
+            .BeLessThan(assignmentIndex, "OnChanging should be called before assignment");
+        assignmentIndex
+            .Should()
+            .BeLessThan(propertyChangedIndex, "assignment should happen before OnPropertyChanged");
+        propertyChangedIndex
+            .Should()
+            .BeLessThan(changedIndex, "OnPropertyChanged should be called before OnChanged");
     }
 
     [Fact]
@@ -99,7 +109,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -130,7 +140,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -163,7 +173,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -192,7 +202,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         // Should not generate any file since there are no valid fields
@@ -218,7 +228,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -244,14 +254,19 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
 
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "GlobalPerson.g.cs");
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(
+            runResult,
+            "GlobalPerson.g.cs"
+        );
         generatedSource.Should().NotBeNull();
-        generatedSource.Should().Contain("public partial class GlobalPerson : INotifyPropertyChanged");
+        generatedSource
+            .Should()
+            .Contain("public partial class GlobalPerson : INotifyPropertyChanged");
         generatedSource.Should().NotContain("namespace");
     }
 
@@ -274,7 +289,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -306,7 +321,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -336,7 +351,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -365,14 +380,19 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
 
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "InternalPerson.g.cs");
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(
+            runResult,
+            "InternalPerson.g.cs"
+        );
         generatedSource.Should().NotBeNull();
-        generatedSource.Should().Contain("internal partial class InternalPerson : INotifyPropertyChanged");
+        generatedSource
+            .Should()
+            .Contain("internal partial class InternalPerson : INotifyPropertyChanged");
     }
 
     [Theory]
@@ -382,7 +402,10 @@ public class GeneratorTests
     [InlineData(AccessLevel.Private, "private")]
     [InlineData(AccessLevel.ProtectedInternal, "protected internal")]
     [InlineData(AccessLevel.PrivateProtected, "private protected")]
-    public void Generator_WithNotifySetter_GeneratesCorrectAccessModifier(AccessLevel level, string expected)
+    public void Generator_WithNotifySetter_GeneratesCorrectAccessModifier(
+        AccessLevel level,
+        string expected
+    )
     {
         // Arrange
         var accessLevelValue = (int)level;
@@ -401,7 +424,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -448,12 +471,15 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
 
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "PersonViewModel.g.cs");
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(
+            runResult,
+            "PersonViewModel.g.cs"
+        );
         generatedSource.Should().NotBeNull();
         // Should NOT contain ": INotifyPropertyChanged" since base already implements it
         generatedSource.Should().NotContain(": INotifyPropertyChanged");
@@ -482,14 +508,19 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
 
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "KeyValuePair.g.cs");
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(
+            runResult,
+            "KeyValuePair.g.cs"
+        );
         generatedSource.Should().NotBeNull();
-        generatedSource.Should().Contain("public partial class KeyValuePair<TKey, TValue> : INotifyPropertyChanged");
+        generatedSource
+            .Should()
+            .Contain("public partial class KeyValuePair<TKey, TValue> : INotifyPropertyChanged");
         generatedSource.Should().Contain("public TKey Key");
         generatedSource.Should().Contain("public TValue Value");
     }
@@ -513,14 +544,16 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
 
         var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "Container.g.cs");
         generatedSource.Should().NotBeNull();
-        generatedSource.Should().Contain("public partial class Container<T> : INotifyPropertyChanged");
+        generatedSource
+            .Should()
+            .Contain("public partial class Container<T> : INotifyPropertyChanged");
         generatedSource.Should().Contain("public T Item");
     }
 
@@ -549,7 +582,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -585,7 +618,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -593,9 +626,13 @@ public class GeneratorTests
         var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "Person.g.cs");
         generatedSource.Should().NotBeNull();
         generatedSource.Should().Contain("INotifyPropertyChanging");
-        generatedSource.Should().Contain("public event PropertyChangingEventHandler? PropertyChanging");
+        generatedSource
+            .Should()
+            .Contain("public event PropertyChangingEventHandler? PropertyChanging");
         generatedSource.Should().Contain("protected virtual void OnPropertyChanging");
-        generatedSource.Should().Contain("PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(propertyName))");
+        generatedSource
+            .Should()
+            .Contain("PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(propertyName))");
     }
 
     [Fact]
@@ -616,7 +653,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -630,7 +667,9 @@ public class GeneratorTests
 
         changingIndex.Should().BeGreaterThan(-1, "OnPropertyChanging should be called");
         assignmentIndex.Should().BeGreaterThan(-1, "Assignment should exist");
-        changingIndex.Should().BeLessThan(assignmentIndex, "OnPropertyChanging should be called before assignment");
+        changingIndex
+            .Should()
+            .BeLessThan(assignmentIndex, "OnPropertyChanging should be called before assignment");
     }
 
     [Fact]
@@ -651,7 +690,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -681,13 +720,18 @@ public class GeneratorTests
                     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
                     private string _name;
 
-                    public object SaveCommand { get; }
+                    public TestCommand SaveCommand { get; } = new();
+
+                    public sealed class TestCommand
+                    {
+                        public void NotifyCanExecuteChanged() { }
+                    }
                 }
             }
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -713,14 +757,19 @@ public class GeneratorTests
                     [NotifyCanExecuteChangedFor(nameof(DeleteCommand))]
                     private string _name;
 
-                    public object SaveCommand { get; }
-                    public object DeleteCommand { get; }
+                    public TestCommand SaveCommand { get; } = new();
+                    public TestCommand DeleteCommand { get; } = new();
+
+                    public sealed class TestCommand
+                    {
+                        public void NotifyCanExecuteChanged() { }
+                    }
                 }
             }
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -754,7 +803,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -766,7 +815,9 @@ public class GeneratorTests
         generatedSource.Should().Contain("private HashSet<string>? _pendingNotifications");
         generatedSource.Should().Contain("public IDisposable SuppressNotifications()");
         generatedSource.Should().Contain("private void ResumeNotifications()");
-        generatedSource.Should().Contain("private sealed class NotificationSuppressor : IDisposable");
+        generatedSource
+            .Should()
+            .Contain("private sealed class NotificationSuppressor : IDisposable");
     }
 
     [Fact]
@@ -788,7 +839,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -818,7 +869,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -849,7 +900,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -889,7 +940,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -898,9 +949,13 @@ public class GeneratorTests
         generatedSource.Should().NotBeNull();
 
         // Verify ResumeNotifications fires pending events
-        generatedSource.Should().Contain("if (--_notificationSuppressionCount == 0 && _pendingNotifications != null)");
+        generatedSource
+            .Should()
+            .Contain("if (--_notificationSuppressionCount == 0 && _pendingNotifications != null)");
         generatedSource.Should().Contain("foreach (var propertyName in _pendingNotifications)");
-        generatedSource.Should().Contain("PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName))");
+        generatedSource
+            .Should()
+            .Contain("PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName))");
         generatedSource.Should().Contain("_pendingNotifications.Clear()");
     }
 
@@ -923,7 +978,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -969,12 +1024,15 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
 
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "PersonViewModel.g.cs");
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(
+            runResult,
+            "PersonViewModel.g.cs"
+        );
         generatedSource.Should().NotBeNull();
 
         // Should NOT generate interface or events (base already has them)
@@ -1004,14 +1062,19 @@ public class GeneratorTests
                     [NotifyCanExecuteChangedFor(nameof(ClearCommand))]
                     private T _value;
 
-                    public object ClearCommand { get; }
+                    public TestCommand ClearCommand { get; } = new();
                     public bool HasValue => _value != null;
+
+                    public sealed class TestCommand
+                    {
+                        public void NotifyCanExecuteChanged() { }
+                    }
                 }
             }
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -1053,14 +1116,19 @@ public class GeneratorTests
                     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
                     private string _name;
 
-                    public object SaveCommand { get; }
+                    public TestCommand SaveCommand { get; } = new();
                     public bool CanSave => !string.IsNullOrEmpty(Name);
+
+                    public sealed class TestCommand
+                    {
+                        public void NotifyCanExecuteChanged() { }
+                    }
                 }
             }
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -1077,8 +1145,12 @@ public class GeneratorTests
         commandIndex.Should().BeGreaterThan(-1);
         changedIndex.Should().BeGreaterThan(-1);
 
-        alsoIndex.Should().BeLessThan(commandIndex, "NotifyAlso should come before command notification");
-        commandIndex.Should().BeLessThan(changedIndex, "Command notification should come before OnChanged");
+        alsoIndex
+            .Should()
+            .BeLessThan(commandIndex, "NotifyAlso should come before command notification");
+        commandIndex
+            .Should()
+            .BeLessThan(changedIndex, "Command notification should come before OnChanged");
     }
 
     [Fact]
@@ -1099,7 +1171,7 @@ public class GeneratorTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -1128,17 +1200,25 @@ public class GeneratorTests
                 [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
                 private string _name;
 
-                public object SaveCommand { get; }
+                public TestCommand SaveCommand { get; } = new();
+
+                public sealed class TestCommand
+                {
+                    public void NotifyCanExecuteChanged() { }
+                }
             }
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
 
-        var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "GlobalViewModel.g.cs");
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(
+            runResult,
+            "GlobalViewModel.g.cs"
+        );
         generatedSource.Should().NotBeNull();
 
         // No namespace declaration

@@ -26,7 +26,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -60,7 +60,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -90,7 +90,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -208,7 +208,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -246,7 +246,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -277,7 +277,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         var generatedSource = GeneratorTestHelper.GetGeneratedSource(runResult, "Edge.g.cs");
@@ -309,7 +309,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -343,7 +343,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -380,7 +380,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -413,7 +413,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -446,7 +446,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         var generatedSource = GeneratorTestHelper.GetGeneratedSource(
@@ -479,7 +479,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -515,7 +515,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
@@ -557,7 +557,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         // May have warnings about types, but should compile
@@ -590,7 +590,7 @@ public class EdgeCaseTests
             """;
 
         // Act
-        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGenerator(source);
+        var (_, diagnostics, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
 
         // Assert
         diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Should().BeEmpty();

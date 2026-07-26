@@ -11,6 +11,23 @@ namespace NotifyGen.Tests;
 /// </summary>
 public static class GeneratorTestHelper
 {
+    private static readonly ImmutableArray<MetadataReference> References = CreateReferences();
+
+    private static ImmutableArray<MetadataReference> CreateReferences()
+    {
+        var platformAssemblies =
+            AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string
+            ?? throw new InvalidOperationException(
+                "The .NET runtime did not provide trusted platform assemblies."
+            );
+
+        return platformAssemblies
+            .Split(Path.PathSeparator)
+            .Select(static path => (MetadataReference)MetadataReference.CreateFromFile(path))
+            .Append(MetadataReference.CreateFromFile(typeof(NotifyAttribute).Assembly.Location))
+            .ToImmutableArray();
+    }
+
     /// <summary>
     /// Runs the NotifyGenerator on the provided source code.
     /// </summary>
@@ -24,36 +41,7 @@ public static class GeneratorTestHelper
         var syntaxTree = CSharpSyntaxTree.ParseText(source);
 
         // Create compilation with references
-        var references = new[]
-        {
-            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-            MetadataReference.CreateFromFile(
-                typeof(System.ComponentModel.INotifyPropertyChanged).Assembly.Location
-            ),
-            MetadataReference.CreateFromFile(typeof(NotifyAttribute).Assembly.Location),
-        };
-
-        // Add System.Runtime reference for netstandard compatibility
-        var runtimeAssembly = AppDomain
-            .CurrentDomain.GetAssemblies()
-            .FirstOrDefault(a => a.GetName().Name == "System.Runtime");
-        if (runtimeAssembly != null)
-        {
-            references = references
-                .Append(MetadataReference.CreateFromFile(runtimeAssembly.Location))
-                .ToArray();
-        }
-
-        // Add netstandard reference
-        var netstandardAssembly = AppDomain
-            .CurrentDomain.GetAssemblies()
-            .FirstOrDefault(a => a.GetName().Name == "netstandard");
-        if (netstandardAssembly != null)
-        {
-            references = references
-                .Append(MetadataReference.CreateFromFile(netstandardAssembly.Location))
-                .ToArray();
-        }
+        var references = References;
 
         var compilation = CSharpCompilation.Create(
             "TestAssembly",
