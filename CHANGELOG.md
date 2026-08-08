@@ -7,10 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-08-09
+
 ### Added
 
-- Forward property-targetable attributes from eligible fields to generated properties
-- Opt into child `INotifyPropertyChanged` notifications with `NotifyAlso.NotifyOnSubPropertyChanged`
+- Forward property-targetable attributes from eligible fields to generated properties, preserving bound constructor/named values and safely skipping file-local symbols
+- Opt into direct child `INotifyPropertyChanged` notifications with `NotifyAlso.NotifyOnSubPropertyChanged`, including replacement/unsubscription handling and **NOTIFY010** guidance
 
 ## [1.7.0] - 2026-08-08
 
