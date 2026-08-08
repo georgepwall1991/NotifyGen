@@ -87,6 +87,21 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             return null;
 
         if (
+            notifyAttribute.ApplicationSyntaxReference?.GetSyntax(ct)
+                is { } attributeSyntax
+            && (
+                attributeSyntax.SyntaxTree != classDeclaration.SyntaxTree
+                || !attributeSyntax
+                    .AncestorsAndSelf()
+                    .OfType<ClassDeclarationSyntax>()
+                    .Any(declaration => declaration.Span == classDeclaration.Span)
+            )
+        )
+        {
+            return null;
+        }
+
+        if (
             !TypeDeclarationInfoFactory.TryCreateChain(
                 semanticModel,
                 classDeclaration,
@@ -158,29 +173,55 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     }
 
     /// <summary>
-    /// Extracts field information from the class.
+    /// Extracts field and incomplete partial-property information from the class.
     /// </summary>
     private static ImmutableArray<FieldInfo> ExtractFields(
         INamedTypeSymbol classSymbol,
         CancellationToken ct
     )
     {
-        return classSymbol
-            .GetMembers()
-            .OfType<IFieldSymbol>()
-            .Where(static field =>
-                FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible
+        var members = ImmutableArray.CreateBuilder<FieldInfo>();
+        foreach (var member in classSymbol.GetMembers())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (
+                member is IFieldSymbol field
+                && FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible
             )
-            .Select(f =>
             {
-                ct.ThrowIfCancellationRequested();
-                return CreateFieldInfo(f);
-            })
-            .ToImmutableArray();
+                members.Add(CreateFieldInfo(field));
+            }
+            else if (member is IPropertySymbol property && IsIncompletePartialProperty(property, ct))
+            {
+                members.Add(CreatePartialPropertyInfo(property));
+            }
+        }
+
+        var directMembers = members.ToImmutable();
+        if (
+            directMembers
+                .GroupBy(static member => member.PropertyName)
+                .Any(static group => group.Skip(1).Any())
+            || classSymbol
+                .GetMembers()
+                .OfType<IPropertySymbol>()
+                .Where(property => !IsIncompletePartialProperty(property, ct))
+                .Select(static property => property.Name)
+                .Intersect(
+                    directMembers.Select(static member => member.PropertyName),
+                    StringComparer.Ordinal
+                )
+                .Any()
+        )
+        {
+            return ImmutableArray<FieldInfo>.Empty;
+        }
+
+        return directMembers;
     }
 
     /// <summary>
-    /// Creates a FieldInfo record from a field symbol.
+    /// Creates metadata from an eligible field symbol.
     /// </summary>
     private static FieldInfo CreateFieldInfo(IFieldSymbol field)
     {
@@ -207,6 +248,34 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     }
 
     /// <summary>
+    /// Creates metadata from an incomplete C# 14 partial property definition.
+    /// </summary>
+    private static FieldInfo CreatePartialPropertyInfo(IPropertySymbol property)
+    {
+        var typeName = property.Type.ToDisplayString(TypeDisplayFormat);
+        return new FieldInfo(
+            "field",
+            property.Name,
+            typeName,
+            IsNullableType(property.Type),
+            GetAttributeValues(property, NotifyAlsoAttributeName),
+            GetAttributeValues(property, NotifyCanExecuteChangedForAttributeName),
+            GetAccessorAccessLevel(property.SetMethod, property.DeclaredAccessibility),
+            isPrimitiveType: IsPrimitiveValueType(property.Type),
+            requiresUnsafe: RequiresUnsafeContext(property.Type),
+            isPartialProperty: true,
+            propertyAccessibility: GetAccessibilityText(property.DeclaredAccessibility),
+            needsNullableBackingField: IsNonNullableReferenceType(property.Type),
+            getterAccess: GetAccessorAccessLevel(property.GetMethod, property.DeclaredAccessibility)
+        );
+    }
+
+    private static bool IsIncompletePartialProperty(
+        IPropertySymbol property,
+        CancellationToken ct
+    ) => PartialPropertyEligibility.IsSupported(property, ct);
+
+    /// <summary>
     /// Gets the property name from [NotifyName] or derives it from the field name.
     /// </summary>
     private static string GetPropertyName(IFieldSymbol field)
@@ -221,6 +290,9 @@ public sealed class NotifyGenerator : IIncrementalGenerator
 
         return char.ToUpperInvariant(field.Name[1]) + field.Name.Substring(2);
     }
+
+    private static bool IsNonNullableReferenceType(ITypeSymbol type) =>
+        type.IsReferenceType && type.NullableAnnotation != NullableAnnotation.Annotated;
 
     /// <summary>
     /// Checks if a type is nullable.
@@ -238,11 +310,11 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     /// Extracts string values from multiple instances of an attribute.
     /// </summary>
     private static ImmutableArray<string> GetAttributeValues(
-        IFieldSymbol field,
+        ISymbol member,
         string attributeName
     )
     {
-        return field
+        return member
             .GetAttributes()
             .Where(a => a.AttributeClass?.ToDisplayString() == attributeName)
             .Select(a => a.ConstructorArguments.FirstOrDefault().Value as string)
@@ -275,6 +347,28 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             _ => null,
         };
     }
+
+    private static string? GetAccessorAccessLevel(
+        IMethodSymbol? accessor,
+        Accessibility propertyAccessibility
+    )
+    {
+        if (accessor == null || accessor.DeclaredAccessibility == propertyAccessibility)
+            return null;
+
+        return GetAccessibilityText(accessor.DeclaredAccessibility);
+    }
+
+    private static string GetAccessibilityText(Accessibility accessibility) =>
+        accessibility switch
+        {
+            Accessibility.Private => "private",
+            Accessibility.Protected => "protected",
+            Accessibility.Internal => "internal",
+            Accessibility.ProtectedOrInternal => "protected internal",
+            Accessibility.ProtectedAndInternal => "private protected",
+            _ => "public",
+        };
 
     /// <summary>
     /// Determines whether emitting the type requires an unsafe declaration context.
@@ -572,9 +666,23 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         bool implementChanging
     )
     {
-        sb.AppendLine($"{indent}    public {field.TypeName} {field.PropertyName}");
+        if (field.IsPartialProperty && field.NeedsNullableBackingField)
+        {
+            sb.AppendLine(
+                $"{indent}    [field: global::System.Diagnostics.CodeAnalysis.MaybeNull, global::System.Diagnostics.CodeAnalysis.AllowNull]"
+            );
+        }
+
+        var partialModifier = field.IsPartialProperty ? " partial" : string.Empty;
+        var backingValue = field.NeedsNullableBackingField
+            ? $"{field.FieldName}!"
+            : field.FieldName;
+        sb.AppendLine(
+            $"{indent}    {field.PropertyAccessibility}{partialModifier} {field.TypeName} {field.PropertyName}"
+        );
         sb.AppendLine($"{indent}    {{");
-        sb.AppendLine($"{indent}        get => {field.FieldName};");
+        var getterModifier = field.GetterAccess != null ? $"{field.GetterAccess} " : "";
+        sb.AppendLine($"{indent}        {getterModifier}get => {backingValue};");
         var setterModifier = field.SetterAccess != null ? $"{field.SetterAccess} " : "";
         sb.AppendLine($"{indent}        {setterModifier}set");
         sb.AppendLine($"{indent}        {{");
@@ -587,12 +695,12 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         }
         else if (field.IsPrimitiveType)
         {
-            sb.AppendLine($"{indent}            if ({field.FieldName} == value) return;");
+            sb.AppendLine($"{indent}            if ({backingValue} == value) return;");
         }
         else
         {
             sb.AppendLine(
-                $"{indent}            if (EqualityComparer<{field.TypeName}>.Default.Equals({field.FieldName}, value)) return;"
+                $"{indent}            if (EqualityComparer<{field.TypeName}>.Default.Equals({backingValue}, value)) return;"
             );
         }
         // Fire PropertyChanging event if enabled
@@ -601,7 +709,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             sb.AppendLine($"{indent}            OnPropertyChanging();");
         }
         sb.AppendLine(
-            $"{indent}            On{field.PropertyName}Changing({field.FieldName}, value);"
+            $"{indent}            On{field.PropertyName}Changing({backingValue}, value);"
         );
         sb.AppendLine($"{indent}            {field.FieldName} = value;");
         sb.AppendLine($"{indent}            OnPropertyChanged();");
@@ -622,4 +730,5 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         sb.AppendLine($"{indent}        }}");
         sb.AppendLine($"{indent}    }}");
     }
+
 }

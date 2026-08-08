@@ -39,11 +39,11 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor UnknownNotifyAlsoProperty = new(
         id: "NOTIFY003",
         title: "Unknown property in NotifyAlso",
-        messageFormat: "Field '{0}' has [NotifyAlso(\"{1}\")] but property '{1}' does not exist on the class. This notification will have no effect.",
+        messageFormat: "Member '{0}' has [NotifyAlso(\"{1}\")] but property '{1}' does not exist on the class. This notification will have no effect.",
         category: "NotifyGen",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "The [NotifyAlso] attribute should reference an existing property name. Check for typos in the property name."
+        description: "The [NotifyAlso] attribute on a field or partial property should reference an existing property name. Check for typos in the property name."
     );
 
     /// <summary>
@@ -96,5 +96,18 @@ internal static class DiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "File-local types are visible only within their declaring source file, so a source generator cannot add a partial declaration from a generated file."
+    );
+
+    /// <summary>
+    /// NOTIFY009: Multiple members would generate the same property name.
+    /// </summary>
+    public static readonly DiagnosticDescriptor GeneratedPropertyNameCollision = new(
+        id: "NOTIFY009",
+        title: "Generated property name collision",
+        messageFormat: "Multiple [Notify] members generate the property '{0}'. Rename one member so NotifyGen can generate an unambiguous property.",
+        category: "NotifyGen",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "NotifyGen cannot emit two properties with the same name."
     );
 }

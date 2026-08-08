@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -25,7 +26,8 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.StaticOrConstField,
             DiagnosticDescriptors.ReadonlyField,
             DiagnosticDescriptors.ContainingTypeMustBePartial,
-            DiagnosticDescriptors.FileLocalTypeNotSupported
+            DiagnosticDescriptors.FileLocalTypeNotSupported,
+            DiagnosticDescriptors.GeneratedPropertyNameCollision
         );
 
     public override void Initialize(AnalysisContext context)
@@ -40,20 +42,33 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
     {
         var classDeclaration = (ClassDeclarationSyntax)context.Node;
 
-        // Get the class symbol
         if (
             context.SemanticModel.GetDeclaredSymbol(classDeclaration, context.CancellationToken)
             is not INamedTypeSymbol classSymbol
         )
             return;
 
-        // Check if class has [Notify] attribute
-        var hasNotifyAttribute = classSymbol
+        var notifyAttribute = classSymbol
             .GetAttributes()
-            .Any(a => a.AttributeClass?.ToDisplayString() == NotifyAttributeName);
+            .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifyAttributeName);
 
-        if (!hasNotifyAttribute)
+        if (notifyAttribute == null)
             return;
+
+        if (
+            notifyAttribute.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken)
+                is { } attributeSyntax
+            && (
+                attributeSyntax.SyntaxTree != classDeclaration.SyntaxTree
+                || !attributeSyntax
+                    .AncestorsAndSelf()
+                    .OfType<ClassDeclarationSyntax>()
+                    .Any(declaration => declaration.Span == classDeclaration.Span)
+            )
+        )
+        {
+            return;
+        }
 
         if (classDeclaration.Modifiers.Any(SyntaxKind.FileKeyword))
         {
@@ -67,7 +82,6 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        // Check if class is partial
         var isPartial = classDeclaration.Modifiers.Any(SyntaxKind.PartialKeyword);
 
         if (!isPartial)
@@ -122,10 +136,8 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         if (hasInvalidContainingType)
             return;
 
-        // Analyze fields for eligibility and report specific issues
         AnalyzeFieldEligibility(context, classSymbol, classDeclaration);
-
-        // Check NotifyAlso references (NOTIFY003)
+        AnalyzeGeneratedPropertyNameCollisions(context, classSymbol, classDeclaration);
         AnalyzeNotifyAlsoReferences(context, classSymbol);
     }
 
@@ -135,7 +147,7 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         ClassDeclarationSyntax classDeclaration
     )
     {
-        var hasEligibleFields = false;
+        var hasEligibleMembers = false;
 
         foreach (var field in classSymbol.GetMembers().OfType<IFieldSymbol>())
         {
@@ -143,13 +155,13 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             switch (eligibility)
             {
                 case FieldEligibility.Eligible:
-                    hasEligibleFields = true;
+                    hasEligibleMembers = true;
                     break;
                 case FieldEligibility.StaticOrConst:
                     context.ReportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.StaticOrConstField,
-                            GetFieldLocation(field, classDeclaration, context.CancellationToken),
+                            GetSymbolLocation(field, classDeclaration, context.CancellationToken),
                             field.Name
                         )
                     );
@@ -158,7 +170,7 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                     context.ReportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.ReadonlyField,
-                            GetFieldLocation(field, classDeclaration, context.CancellationToken),
+                            GetSymbolLocation(field, classDeclaration, context.CancellationToken),
                             field.Name
                         )
                     );
@@ -166,7 +178,17 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             }
         }
 
-        if (!hasEligibleFields)
+        if (
+            classSymbol
+                .GetMembers()
+                .OfType<IPropertySymbol>()
+                .Any(property => IsIncompletePartialProperty(property, context.CancellationToken))
+        )
+        {
+            hasEligibleMembers = true;
+        }
+
+        if (!hasEligibleMembers)
         {
             context.ReportDiagnostic(
                 Diagnostic.Create(
@@ -178,17 +200,63 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static Location GetFieldLocation(
-        IFieldSymbol field,
-        ClassDeclarationSyntax classDeclaration,
-        System.Threading.CancellationToken cancellationToken
+    private static void AnalyzeGeneratedPropertyNameCollisions(
+        SyntaxNodeAnalysisContext context,
+        INamedTypeSymbol classSymbol,
+        ClassDeclarationSyntax classDeclaration
     )
     {
-        return field
-                .DeclaringSyntaxReferences.FirstOrDefault()
-                ?.GetSyntax(cancellationToken)
-                .GetLocation()
-            ?? classDeclaration.Identifier.GetLocation();
+        var generatedNames = new Dictionary<string, ISymbol>();
+        foreach (var member in classSymbol.GetMembers())
+        {
+            var propertyName = member switch
+            {
+                IFieldSymbol field when
+                    FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible
+                    => GetPropertyName(field),
+                IPropertySymbol property when
+                    IsIncompletePartialProperty(property, context.CancellationToken)
+                    => property.Name,
+                _ => null,
+            };
+
+            if (propertyName == null)
+                continue;
+
+            if (generatedNames.ContainsKey(propertyName))
+            {
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.GeneratedPropertyNameCollision,
+                        GetSymbolLocation(member, classDeclaration, context.CancellationToken),
+                        propertyName
+                    )
+                );
+            }
+            else
+            {
+                generatedNames.Add(propertyName, member);
+            }
+        }
+
+        foreach (var property in classSymbol.GetMembers().OfType<IPropertySymbol>())
+        {
+            if (
+                IsIncompletePartialProperty(property, context.CancellationToken)
+                || !generatedNames.ContainsKey(property.Name)
+            )
+            {
+                continue;
+            }
+
+            context.ReportDiagnostic(
+                Diagnostic.Create(
+                    DiagnosticDescriptors.GeneratedPropertyNameCollision,
+                    GetSymbolLocation(property, classDeclaration, context.CancellationToken),
+                    property.Name
+                )
+            );
+        }
     }
 
     private static void AnalyzeNotifyAlsoReferences(
@@ -196,80 +264,103 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         INamedTypeSymbol classSymbol
     )
     {
-        // Collect all property names that exist or will be generated
         var existingProperties = classSymbol
             .GetMembers()
             .OfType<IPropertySymbol>()
             .Select(p => p.Name)
             .ToImmutableHashSet();
 
-        // Collect property names that will be generated from fields (respecting [NotifyName])
-        var generatedProperties = classSymbol
-            .GetMembers()
-            .OfType<IFieldSymbol>()
-            .Where(static field =>
-                FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible
-            )
-            .Select(f =>
-            {
-                var notifyNameAttr = f.GetAttributes()
-                    .FirstOrDefault(a =>
-                        a.AttributeClass?.ToDisplayString() == NotifyNameAttributeName
-                    );
-                return notifyNameAttr?.ConstructorArguments.FirstOrDefault().Value as string
-                    ?? char.ToUpperInvariant(f.Name[1]) + f.Name.Substring(2);
-            })
-            .ToImmutableHashSet();
-
-        var allKnownProperties = existingProperties.Union(generatedProperties);
-
-        // Check each field with [NotifyAlso]
+        var generatedMembers = new Dictionary<string, ISymbol>();
         foreach (var field in classSymbol.GetMembers().OfType<IFieldSymbol>())
         {
-            var notifyAlsoAttributes = field
-                .GetAttributes()
-                .Where(a => a.AttributeClass?.ToDisplayString() == NotifyAlsoAttributeName);
+            if (FieldEligibilityClassifier.Classify(field) != FieldEligibility.Eligible)
+                continue;
 
-            foreach (var attr in notifyAlsoAttributes)
+            generatedMembers[GetPropertyName(field)] = field;
+        }
+
+        foreach (var property in classSymbol.GetMembers().OfType<IPropertySymbol>())
+        {
+            if (IsIncompletePartialProperty(property, context.CancellationToken))
+                generatedMembers[property.Name] = property;
+        }
+
+        var allKnownProperties = existingProperties.Union(generatedMembers.Keys);
+
+        foreach (var generatedMember in generatedMembers)
+        {
+            foreach (var attribute in GetNotifyAlsoAttributes(generatedMember.Value))
             {
-                var propertyName = attr.ConstructorArguments.FirstOrDefault().Value as string;
+                var propertyName = attribute.ConstructorArguments.FirstOrDefault().Value as string;
                 if (string.IsNullOrEmpty(propertyName))
                     continue;
 
                 if (!allKnownProperties.Contains(propertyName!))
                 {
-                    // Find the attribute syntax location for better error placement
-                    var location = GetAttributeLocation(field, attr, context.CancellationToken);
-
-                    var diagnostic = Diagnostic.Create(
-                        DiagnosticDescriptors.UnknownNotifyAlsoProperty,
-                        location,
-                        field.Name,
-                        propertyName
+                    var location = GetAttributeLocation(
+                        generatedMember.Value,
+                        attribute,
+                        context.CancellationToken
                     );
-                    context.ReportDiagnostic(diagnostic);
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.UnknownNotifyAlsoProperty,
+                            location,
+                            generatedMember.Value.Name,
+                            propertyName
+                        )
+                    );
                 }
             }
         }
     }
 
+    private static IEnumerable<AttributeData> GetNotifyAlsoAttributes(ISymbol member) =>
+        member
+            .GetAttributes()
+            .Where(a => a.AttributeClass?.ToDisplayString() == NotifyAlsoAttributeName);
+
+    private static string GetPropertyName(IFieldSymbol field)
+    {
+        var notifyNameAttr = field
+            .GetAttributes()
+            .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifyNameAttributeName);
+
+        if (notifyNameAttr?.ConstructorArguments.FirstOrDefault().Value is string customName)
+            return customName;
+
+        return char.ToUpperInvariant(field.Name[1]) + field.Name.Substring(2);
+    }
+
+    private static bool IsIncompletePartialProperty(
+        IPropertySymbol property,
+        System.Threading.CancellationToken ct
+    ) => PartialPropertyEligibility.IsSupported(property, ct);
+
+    private static Location GetSymbolLocation(
+        ISymbol symbol,
+        ClassDeclarationSyntax classDeclaration,
+        System.Threading.CancellationToken cancellationToken
+    )
+    {
+        return symbol
+                .DeclaringSyntaxReferences.FirstOrDefault()
+                ?.GetSyntax(cancellationToken)
+                .GetLocation()
+            ?? classDeclaration.Identifier.GetLocation();
+    }
+
     private static Location GetAttributeLocation(
-        IFieldSymbol field,
+        ISymbol member,
         AttributeData attribute,
         System.Threading.CancellationToken ct
     )
     {
-        // Try to get the syntax location of the attribute
         if (attribute.ApplicationSyntaxReference?.GetSyntax(ct) is { } syntax)
-        {
             return syntax.GetLocation();
-        }
 
-        // Fall back to the field's location
-        if (field.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(ct) is { } fieldSyntax)
-        {
-            return fieldSyntax.GetLocation();
-        }
+        if (member.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(ct) is { } memberSyntax)
+            return memberSyntax.GetLocation();
 
         return Location.None;
     }
