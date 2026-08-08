@@ -25,6 +25,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     private const string NotifyCanExecuteChangedForAttributeName =
         "NotifyGen.NotifyCanExecuteChangedForAttribute";
     private const string NotifySuppressableAttributeName = "NotifyGen.NotifySuppressableAttribute";
+    private const string AttributeUsageAttributeName = "System.AttributeUsageAttribute";
 
     /// <summary>
     /// Cached SymbolDisplayFormat for type names to avoid repeated allocations.
@@ -36,6 +37,13 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes
             | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier
             | SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers
+    );
+
+    private static readonly SymbolDisplayFormat FullyQualifiedTypeDisplayFormat = new(
+        globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Included,
+        typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+        genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
+        miscellaneousOptions: SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers
     );
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
@@ -189,7 +197,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 && FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible
             )
             {
-                members.Add(CreateFieldInfo(field));
+                members.Add(CreateFieldInfo(field, ct));
             }
             else if (member is IPropertySymbol property && IsIncompletePartialProperty(property, ct))
             {
@@ -279,7 +287,10 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     /// <summary>
     /// Creates metadata from an eligible field symbol.
     /// </summary>
-    private static FieldInfo CreateFieldInfo(IFieldSymbol field)
+    private static FieldInfo CreateFieldInfo(
+        IFieldSymbol field,
+        CancellationToken cancellationToken
+    )
     {
         var propertyName = GetPropertyName(field);
         var typeName = field.Type.ToDisplayString(TypeDisplayFormat);
@@ -299,7 +310,9 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             commandsToNotify,
             setterAccess,
             isPrimitiveType,
-            requiresUnsafe
+            requiresUnsafe,
+            propertyAttributes: GetForwardedPropertyAttributes(field, cancellationToken),
+            subPropertyNotify: GetSubPropertyNotifyTargets(field)
         );
     }
 
@@ -322,7 +335,8 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             isPartialProperty: true,
             propertyAccessibility: GetAccessibilityText(property.DeclaredAccessibility),
             needsNullableBackingField: IsNonNullableReferenceType(property.Type),
-            getterAccess: GetAccessorAccessLevel(property.GetMethod, property.DeclaredAccessibility)
+            getterAccess: GetAccessorAccessLevel(property.GetMethod, property.DeclaredAccessibility),
+            subPropertyNotify: GetSubPropertyNotifyTargets(property)
         );
     }
 
@@ -360,6 +374,317 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 type is INamedTypeSymbol namedType
                 && namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T
             );
+    }
+
+    /// <summary>
+    /// Gets source attributes that can legally be applied to a generated property.
+    /// </summary>
+    private static ImmutableArray<string> GetForwardedPropertyAttributes(
+        IFieldSymbol field,
+        CancellationToken cancellationToken
+    )
+    {
+        var forwarded = ImmutableArray.CreateBuilder<string>();
+        foreach (var attribute in field.GetAttributes())
+        {
+            if (
+                attribute.AttributeClass is not { } attributeClass
+                || IsNotifyGenAttribute(attributeClass)
+                || IsFileLocalType(attributeClass, cancellationToken)
+                || attribute.ConstructorArguments.Any(argument =>
+                    ContainsFileLocalType(argument, cancellationToken)
+                )
+                || attribute.NamedArguments.Any(named =>
+                    ContainsFileLocalType(named.Value, cancellationToken)
+                )
+                || !CanApplyToProperty(attributeClass, cancellationToken)
+            )
+            {
+                continue;
+            }
+
+            forwarded.Add(FormatAttribute(attribute));
+        }
+
+        return forwarded.ToImmutable();
+    }
+
+    private static bool ContainsFileLocalType(
+        TypedConstant constant,
+        CancellationToken cancellationToken
+    )
+    {
+        if (constant.IsNull)
+            return false;
+
+        if (constant.Type != null && IsFileLocalType(constant.Type, cancellationToken))
+            return true;
+
+        if (constant.Kind == TypedConstantKind.Type && constant.Value is ITypeSymbol type)
+            return IsFileLocalType(type, cancellationToken);
+
+        return constant.Kind == TypedConstantKind.Array
+            && constant.Values.Any(value => ContainsFileLocalType(value, cancellationToken));
+    }
+
+    private static bool IsNotifyGenAttribute(INamedTypeSymbol attributeClass)
+    {
+        var namespaceName = attributeClass.ContainingNamespace.ToDisplayString();
+        return namespaceName == "NotifyGen"
+            || namespaceName.StartsWith("NotifyGen.", StringComparison.Ordinal);
+    }
+
+    private static bool IsFileLocalType(
+        ITypeSymbol type,
+        CancellationToken cancellationToken
+    )
+    {
+        return type switch
+        {
+            IArrayTypeSymbol array
+                => IsFileLocalType(array.ElementType, cancellationToken),
+            IPointerTypeSymbol pointer
+                => IsFileLocalType(pointer.PointedAtType, cancellationToken),
+            INamedTypeSymbol named
+                => IsFileLocalNamedType(named, cancellationToken)
+                    || named.TypeArguments.Any(argument =>
+                        IsFileLocalType(argument, cancellationToken)
+                    ),
+            _ => false,
+        };
+    }
+
+    private static bool IsFileLocalNamedType(
+        INamedTypeSymbol type,
+        CancellationToken cancellationToken
+    )
+    {
+        for (var current = type; current != null; current = current.ContainingType)
+        {
+            foreach (var reference in current.DeclaringSyntaxReferences)
+            {
+                var syntax = reference.GetSyntax(cancellationToken);
+                if (
+                    syntax is BaseTypeDeclarationSyntax declaration
+                    && declaration.Modifiers.Any(SyntaxKind.FileKeyword)
+                    || syntax is DelegateDeclarationSyntax delegateDeclaration
+                        && delegateDeclaration.Modifiers.Any(SyntaxKind.FileKeyword)
+                )
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsDirectAttributeUsage(
+        AttributeData usage,
+        INamedTypeSymbol attributeClass,
+        CancellationToken cancellationToken
+    )
+    {
+        if (
+            usage.ApplicationSyntaxReference?.GetSyntax(cancellationToken)
+            is not AttributeSyntax attributeSyntax
+        )
+        {
+            return false;
+        }
+
+        var declaringType = attributeSyntax
+            .Ancestors()
+            .OfType<TypeDeclarationSyntax>()
+            .FirstOrDefault();
+        return declaringType != null
+            && attributeClass.DeclaringSyntaxReferences.Any(reference =>
+                reference.GetSyntax(cancellationToken).Span == declaringType.Span
+            );
+    }
+
+    private static bool CanApplyToProperty(
+        INamedTypeSymbol attributeClass,
+        CancellationToken cancellationToken
+    )
+    {
+        AttributeData? usage = null;
+        for (var current = attributeClass; current != null; current = current.BaseType)
+        {
+            var hasSourceDeclaration = current.DeclaringSyntaxReferences.Length > 0;
+            usage = current
+                .GetAttributes()
+                .Where(attribute =>
+                    attribute.AttributeClass?.ToDisplayString() == AttributeUsageAttributeName
+                )
+                .FirstOrDefault(attribute =>
+                    !hasSourceDeclaration
+                    || IsDirectAttributeUsage(attribute, current, cancellationToken)
+                );
+            if (usage != null)
+                break;
+        }
+
+        if (usage == null || usage.ConstructorArguments.Length == 0)
+            return true;
+
+        var targets = usage.ConstructorArguments[0].Value;
+        if (targets == null)
+            return false;
+
+        var targetValue = Convert.ToInt64(
+            targets,
+            System.Globalization.CultureInfo.InvariantCulture
+        );
+        return ((AttributeTargets)targetValue & AttributeTargets.Property) != 0;
+    }
+
+    private static string FormatAttribute(AttributeData attribute)
+    {
+        var attributeType = attribute.AttributeClass!.ToDisplayString(
+            FullyQualifiedTypeDisplayFormat
+        );
+        var arguments = attribute
+            .ConstructorArguments
+            .Select(FormatTypedConstant)
+            .Concat(
+                attribute.NamedArguments.Select(named =>
+                    $"{EscapeIdentifier(named.Key)} = {FormatTypedConstant(named.Value)}"
+                )
+            );
+        return $"[{attributeType}({string.Join(", ", arguments)})]";
+    }
+
+    private static string FormatTypedConstant(TypedConstant constant)
+    {
+        if (constant.IsNull)
+            return "null";
+
+        if (constant.Kind == TypedConstantKind.Array)
+        {
+            var arrayType = (IArrayTypeSymbol)constant.Type!;
+            return $"new {FormatType(arrayType.ElementType)}[] {{ {string.Join(", ", constant.Values.Select(FormatTypedConstant))} }}";
+        }
+
+        if (constant.Kind == TypedConstantKind.Type && constant.Value is ITypeSymbol type)
+            return $"typeof({FormatType(type)})";
+
+        if (constant.Kind == TypedConstantKind.Enum)
+        {
+            return $"({FormatType(constant.Type!)}){Convert.ToString(constant.Value, System.Globalization.CultureInfo.InvariantCulture)}";
+        }
+
+        var formatted = FormatPrimitive(constant.Value!);
+        formatted = constant.Type?.SpecialType switch
+        {
+            SpecialType.System_Byte => $"(byte){formatted}",
+            SpecialType.System_SByte => $"(sbyte){formatted}",
+            SpecialType.System_Int16 => $"(short){formatted}",
+            SpecialType.System_UInt16 => $"(ushort){formatted}",
+            _ => formatted,
+        };
+
+        return formatted;
+    }
+
+    private static string EscapeIdentifier(string identifier) =>
+        SyntaxFacts.GetKeywordKind(identifier) != SyntaxKind.None
+            || SyntaxFacts.GetContextualKeywordKind(identifier) != SyntaxKind.None
+            ? "@" + identifier
+            : identifier;
+
+    private static string FormatType(ITypeSymbol type) =>
+        type.ToDisplayString(FullyQualifiedTypeDisplayFormat);
+
+    private static string FormatPrimitive(object value) =>
+        value switch
+        {
+            string text => QuoteString(text),
+            char character => QuoteChar(character),
+            bool boolean => boolean ? "true" : "false",
+            float single => single.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "F",
+            double doubleValue => doubleValue.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "D",
+            long longValue => longValue.ToString(System.Globalization.CultureInfo.InvariantCulture) + "L",
+            ulong ulongValue => ulongValue.ToString(System.Globalization.CultureInfo.InvariantCulture) + "UL",
+            uint uintValue => uintValue.ToString(System.Globalization.CultureInfo.InvariantCulture) + "U",
+            _ => Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture)!
+        };
+
+    private static string QuoteString(string value) => $"\"{Escape(value)}\"";
+
+    private static string QuoteChar(char value) => $"'{Escape(value.ToString())}'";
+
+    private static string Escape(string value)
+    {
+        var builder = new StringBuilder(value.Length + 8);
+        foreach (var character in value)
+        {
+            if (character == '\\')
+                builder.Append('\\').Append('\\');
+            else if (character == '"')
+                builder.Append('\\').Append('"');
+            else if (character == '\'')
+                builder.Append('\\').Append('\'');
+            else if (character == '\0')
+                builder.Append('\\').Append('0');
+            else if (character == '\a')
+                builder.Append('\\').Append('a');
+            else if (character == '\b')
+                builder.Append('\\').Append('b');
+            else if (character == '\f')
+                builder.Append('\\').Append('f');
+            else if (character == '\n')
+                builder.Append('\\').Append('n');
+            else if (character == '\r')
+                builder.Append('\\').Append('r');
+            else if (character == '\t')
+                builder.Append('\\').Append('t');
+            else if (character == '\v')
+                builder.Append('\\').Append('v');
+            else if (char.IsControl(character))
+                builder.Append("\\u").Append(((int)character).ToString("X4"));
+            else
+                builder.Append(character);
+        }
+
+        return builder.ToString();
+    }
+
+    private static ImmutableArray<string> GetSubPropertyNotifyTargets(ISymbol member)
+    {
+        var memberType = member switch
+        {
+            IFieldSymbol field => field.Type,
+            IPropertySymbol property => property.Type,
+            _ => null,
+        };
+        if (
+            memberType is null
+            || memberType is not ITypeParameterSymbol
+                && !memberType.IsReferenceType
+            || memberType is ITypeParameterSymbol parameter
+                && !parameter.HasReferenceTypeConstraint
+        )
+        {
+            return ImmutableArray<string>.Empty;
+        }
+
+        return member
+            .GetAttributes()
+            .Where(attribute =>
+                attribute.AttributeClass?.ToDisplayString() == NotifyAlsoAttributeName
+            )
+            .Where(attribute =>
+                attribute.NamedArguments.Any(named =>
+                    named.Key == "NotifyOnSubPropertyChanged"
+                    && named.Value.Value is true
+                )
+            )
+            .Select(attribute => attribute.ConstructorArguments.FirstOrDefault().Value as string)
+            .Where(static value => !string.IsNullOrEmpty(value))
+            .Cast<string>()
+            .Distinct(StringComparer.Ordinal)
+            .ToImmutableArray();
     }
 
     /// <summary>
@@ -581,6 +906,16 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             sb.AppendLine();
         }
 
+        // Generate child-property subscription state and handlers.
+        foreach (var field in classInfo.Fields)
+        {
+            if (!HasSubPropertySubscription(field))
+                continue;
+
+            GenerateSubPropertyMembers(sb, field, indent);
+            sb.AppendLine();
+        }
+
         // Generate properties
         foreach (var field in classInfo.Fields)
         {
@@ -712,6 +1047,97 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         );
     }
 
+    private static bool HasSubPropertySubscription(FieldInfo field) =>
+        field.SubPropertyNotify.Length > 0 && !field.RequiresUnsafe;
+
+    private static string GetSubPropertyMemberPrefix(FieldInfo field)
+    {
+        var builder = new StringBuilder("__notifyGenSubProperty_");
+        foreach (var character in field.PropertyName)
+        {
+            builder.Append(char.IsLetterOrDigit(character) || character == '_' ? character : '_');
+        }
+
+        unchecked
+        {
+            var hash = 2166136261u;
+            foreach (var character in field.PropertyName + "|" + field.FieldName)
+            {
+                hash ^= character;
+                hash *= 16777619u;
+            }
+
+            builder.Append('_').Append(hash.ToString("X8"));
+        }
+
+        return builder.ToString();
+    }
+
+    private static void GenerateSubPropertyMembers(
+        StringBuilder sb,
+        FieldInfo field,
+        string indent
+    )
+    {
+        var prefix = GetSubPropertyMemberPrefix(field);
+        sb.AppendLine(
+            $"{indent}    private global::System.ComponentModel.INotifyPropertyChanged? {prefix}Source;"
+        );
+        sb.AppendLine($"{indent}    private bool {prefix}Initialized;");
+        sb.AppendLine($"{indent}    private void {prefix}Changed(");
+        sb.AppendLine(
+            $"{indent}        object? sender, global::System.ComponentModel.PropertyChangedEventArgs e"
+        );
+        sb.AppendLine($"{indent}    )");
+        sb.AppendLine($"{indent}    {{");
+        foreach (var propertyName in field.SubPropertyNotify)
+        {
+            sb.AppendLine(
+                $"{indent}        OnPropertyChanged({QuoteString(propertyName)});"
+            );
+        }
+        sb.AppendLine($"{indent}    }}");
+        sb.AppendLine();
+        sb.AppendLine($"{indent}    private void {prefix}Ensure(object? currentValue)");
+        sb.AppendLine($"{indent}    {{");
+        sb.AppendLine($"{indent}        if ({prefix}Initialized)");
+        sb.AppendLine($"{indent}            return;");
+        sb.AppendLine();
+        sb.AppendLine($"{indent}        {prefix}Initialized = true;");
+        sb.AppendLine(
+            $"{indent}        if (currentValue is global::System.ComponentModel.INotifyPropertyChanged currentSource)"
+        );
+        sb.AppendLine($"{indent}        {{");
+        sb.AppendLine($"{indent}            {prefix}Source = currentSource;");
+        sb.AppendLine(
+            $"{indent}            currentSource.PropertyChanged += {prefix}Changed;"
+        );
+        sb.AppendLine($"{indent}        }}");
+        sb.AppendLine($"{indent}    }}");
+        sb.AppendLine();
+        sb.AppendLine($"{indent}    private void {prefix}Update(object? newValue)");
+        sb.AppendLine($"{indent}    {{");
+        sb.AppendLine($"{indent}        {prefix}Ensure(newValue);");
+        sb.AppendLine($"{indent}        if ({prefix}Source is not null)");
+        sb.AppendLine($"{indent}        {{");
+        sb.AppendLine(
+            $"{indent}            {prefix}Source.PropertyChanged -= {prefix}Changed;"
+        );
+        sb.AppendLine($"{indent}            {prefix}Source = null;");
+        sb.AppendLine($"{indent}        }}");
+        sb.AppendLine();
+        sb.AppendLine(
+            $"{indent}        if (newValue is global::System.ComponentModel.INotifyPropertyChanged newSource)"
+        );
+        sb.AppendLine($"{indent}        {{");
+        sb.AppendLine($"{indent}            {prefix}Source = newSource;");
+        sb.AppendLine(
+            $"{indent}            newSource.PropertyChanged += {prefix}Changed;"
+        );
+        sb.AppendLine($"{indent}        }}");
+        sb.AppendLine($"{indent}    }}");
+    }
+
     /// <summary>
     /// Generates a single property.
     /// </summary>
@@ -722,6 +1148,14 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         bool implementChanging
     )
     {
+        if (!field.PropertyAttributes.IsDefaultOrEmpty)
+        {
+            foreach (var attribute in field.PropertyAttributes)
+            {
+                sb.AppendLine($"{indent}    {attribute}");
+            }
+        }
+
         if (field.IsPartialProperty && field.NeedsNullableBackingField)
         {
             sb.AppendLine(
@@ -733,15 +1167,34 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         var backingValue = field.NeedsNullableBackingField
             ? $"{field.FieldName}!"
             : field.FieldName;
+        var hasSubPropertySubscription = HasSubPropertySubscription(field);
+        var subPropertyPrefix = hasSubPropertySubscription
+            ? GetSubPropertyMemberPrefix(field)
+            : string.Empty;
         sb.AppendLine(
             $"{indent}    {field.PropertyAccessibility}{partialModifier} {field.TypeName} {field.PropertyName}"
         );
         sb.AppendLine($"{indent}    {{");
         var getterModifier = field.GetterAccess != null ? $"{field.GetterAccess} " : "";
-        sb.AppendLine($"{indent}        {getterModifier}get => {backingValue};");
+        if (hasSubPropertySubscription)
+        {
+            sb.AppendLine($"{indent}        {getterModifier}get");
+            sb.AppendLine($"{indent}        {{");
+            sb.AppendLine($"{indent}            {subPropertyPrefix}Ensure({backingValue});");
+            sb.AppendLine($"{indent}            return {backingValue};");
+            sb.AppendLine($"{indent}        }}");
+        }
+        else
+        {
+            sb.AppendLine($"{indent}        {getterModifier}get => {backingValue};");
+        }
         var setterModifier = field.SetterAccess != null ? $"{field.SetterAccess} " : "";
         sb.AppendLine($"{indent}        {setterModifier}set");
         sb.AppendLine($"{indent}        {{");
+        if (hasSubPropertySubscription)
+        {
+            sb.AppendLine($"{indent}            {subPropertyPrefix}Ensure({backingValue});");
+        }
         // Pointer-like types use native-int equality to avoid function-pointer comparison warnings.
         if (field.IsPrimitiveType && field.RequiresUnsafe)
         {
@@ -768,12 +1221,18 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             $"{indent}            On{field.PropertyName}Changing({backingValue}, value);"
         );
         sb.AppendLine($"{indent}            {field.FieldName} = value;");
+        if (hasSubPropertySubscription)
+        {
+            sb.AppendLine($"{indent}            {subPropertyPrefix}Update(value);");
+        }
         sb.AppendLine($"{indent}            OnPropertyChanged();");
 
         // NotifyAlso properties
         foreach (var alsoNotify in field.AlsoNotify)
         {
-            sb.AppendLine($"{indent}            OnPropertyChanged(\"{alsoNotify}\");");
+            sb.AppendLine(
+                $"{indent}            OnPropertyChanged({QuoteString(alsoNotify)});"
+            );
         }
 
         // NotifyCanExecuteChanged for commands (requires IRelayCommand or compatible type)

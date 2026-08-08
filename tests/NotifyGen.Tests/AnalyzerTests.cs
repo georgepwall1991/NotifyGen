@@ -113,6 +113,60 @@ public class AnalyzerTests
     }
 
     [Fact]
+    public async Task Analyzer_NotifyAlsoSubPropertyChangedWithoutInpc_ReportsWarning()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyAlso(nameof(DisplayName), NotifyOnSubPropertyChanged = true)]
+                private string _name = string.Empty;
+
+                public string DisplayName => Name;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = diagnostics.Should().ContainSingle(diagnostic =>
+            diagnostic.Id == "NOTIFY010"
+        ).Subject;
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Warning);
+        diagnostic.GetMessage().Should().Contain("_name");
+        SourceText.From(source).ToString(diagnostic.Location.SourceSpan)
+            .Should().Contain("NotifyAlso");
+    }
+
+    [Fact]
+    public async Task Analyzer_NotifyAlsoSubPropertyChangedForStructInpc_ReportsWarning()
+    {
+        var source = """
+            using System.ComponentModel;
+            using NotifyGen;
+
+            public struct Child : INotifyPropertyChanged
+            {
+                public event PropertyChangedEventHandler? PropertyChanged;
+            }
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyAlso(nameof(DisplayName), NotifyOnSubPropertyChanged = true)]
+                private Child _child;
+
+                public string DisplayName => string.Empty;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == "NOTIFY010");
+    }
+
+    [Fact]
     public async Task Analyzer_NotifyAlsoWithUnknownProperty_ReportsWarning()
     {
         // Arrange
@@ -1201,6 +1255,18 @@ public class AnalyzerTests
         descriptor.Title.ToString().Should().NotBeEmpty();
         descriptor.Category.Should().Be("NotifyGen");
         descriptor.DefaultSeverity.Should().Be(DiagnosticSeverity.Error);
+        descriptor.IsEnabledByDefault.Should().BeTrue();
+    }
+
+    [Fact]
+    public void DiagnosticDescriptors_NotifyAlsoSubPropertyRequiresInpc_HasCorrectProperties()
+    {
+        var descriptor = DiagnosticDescriptors.NotifyAlsoSubPropertyRequiresInpc;
+
+        descriptor.Id.Should().Be("NOTIFY010");
+        descriptor.Title.ToString().Should().NotBeEmpty();
+        descriptor.Category.Should().Be("NotifyGen");
+        descriptor.DefaultSeverity.Should().Be(DiagnosticSeverity.Warning);
         descriptor.IsEnabledByDefault.Should().BeTrue();
     }
 

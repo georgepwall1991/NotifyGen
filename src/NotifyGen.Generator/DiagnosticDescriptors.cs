@@ -123,4 +123,17 @@ internal static class DiagnosticDescriptors
         isEnabledByDefault: true,
         description: "NotifyGen cannot emit two properties with the same name."
     );
+
+    /// <summary>
+    /// NOTIFY010: Child notification tracking requires INotifyPropertyChanged.
+    /// </summary>
+    public static readonly DiagnosticDescriptor NotifyAlsoSubPropertyRequiresInpc = new(
+        id: "NOTIFY010",
+        title: "Sub-property notification requires a reference INotifyPropertyChanged child",
+        messageFormat: "Member '{0}' opts into NotifyOnSubPropertyChanged, but its type is not a reference value implementing INotifyPropertyChanged. Child changes will not be observed.",
+        category: "NotifyGen",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "NotifyOnSubPropertyChanged can track child changes only for reference values that implement System.ComponentModel.INotifyPropertyChanged."
+    );
 }

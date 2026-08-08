@@ -10,6 +10,9 @@ namespace NotifyGen;
 /// <code>
 /// [NotifyAlso("FullName")]
 /// private string _firstName;
+///
+/// [NotifyAlso(nameof(DisplayName), NotifyOnSubPropertyChanged = true)]
+/// private Address? _address;
 /// </code>
 /// </example>
 [AttributeUsage(
@@ -23,6 +26,12 @@ public sealed class NotifyAlsoAttribute : Attribute
     /// Gets the name of the property that should also be notified when this field changes.
     /// </summary>
     public string PropertyName { get; }
+
+    /// <summary>
+    /// Gets or sets whether changes raised by the source property's child
+    /// INotifyPropertyChanged object should also notify <see cref="PropertyName"/>.
+    /// </summary>
+    public bool NotifyOnSubPropertyChanged { get; set; }
 
     /// <summary>
     /// Creates a new instance of NotifyAlsoAttribute.

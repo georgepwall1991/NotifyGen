@@ -35,6 +35,11 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
     public ImmutableArray<string> AlsoNotify { get; }
 
     /// <summary>
+    /// Direct dependent properties to notify when a child INPC raises a change.
+    /// </summary>
+    public ImmutableArray<string> SubPropertyNotify { get; }
+
+    /// <summary>
     /// Command names to call NotifyCanExecuteChanged() on when this field changes.
     /// </summary>
     public ImmutableArray<string> CommandsToNotify { get; }
@@ -76,6 +81,11 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
     /// </summary>
     public string? GetterAccess { get; }
 
+    /// <summary>
+    /// Source attributes that are valid on the generated property.
+    /// </summary>
+    public ImmutableArray<string> PropertyAttributes { get; }
+
     public FieldInfo(
         string fieldName,
         string propertyName,
@@ -89,7 +99,9 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         bool isPartialProperty = false,
         string propertyAccessibility = "public",
         bool needsNullableBackingField = false,
-        string? getterAccess = null
+        string? getterAccess = null,
+        ImmutableArray<string> propertyAttributes = default,
+        ImmutableArray<string> subPropertyNotify = default
     )
     {
         FieldName = fieldName;
@@ -97,6 +109,7 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         TypeName = typeName;
         IsNullable = isNullable;
         AlsoNotify = alsoNotify;
+        SubPropertyNotify = subPropertyNotify;
         CommandsToNotify = commandsToNotify;
         SetterAccess = setterAccess;
         IsPrimitiveType = isPrimitiveType;
@@ -105,6 +118,12 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         PropertyAccessibility = propertyAccessibility;
         NeedsNullableBackingField = needsNullableBackingField;
         GetterAccess = getterAccess;
+        PropertyAttributes = propertyAttributes.IsDefault
+            ? ImmutableArray<string>.Empty
+            : propertyAttributes;
+        SubPropertyNotify = subPropertyNotify.IsDefault
+            ? ImmutableArray<string>.Empty
+            : subPropertyNotify;
     }
 
     public FieldInfo WithAlsoNotify(ImmutableArray<string> alsoNotify) =>
@@ -121,7 +140,9 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             IsPartialProperty,
             PropertyAccessibility,
             NeedsNullableBackingField,
-            GetterAccess
+            GetterAccess,
+            PropertyAttributes,
+            SubPropertyNotify
         );
 
     public bool Equals(FieldInfo other)
@@ -137,6 +158,8 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             && PropertyAccessibility == other.PropertyAccessibility
             && NeedsNullableBackingField == other.NeedsNullableBackingField
             && GetterAccess == other.GetterAccess
+            && PropertyAttributes.SequenceEqual(other.PropertyAttributes)
+            && SubPropertyNotify.SequenceEqual(other.SubPropertyNotify)
             && AlsoNotify.SequenceEqual(other.AlsoNotify)
             && CommandsToNotify.SequenceEqual(other.CommandsToNotify);
     }
@@ -162,6 +185,10 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             hash = hash * 31 + (PropertyAccessibility?.GetHashCode() ?? 0);
             hash = hash * 31 + NeedsNullableBackingField.GetHashCode();
             hash = hash * 31 + (GetterAccess?.GetHashCode() ?? 0);
+            foreach (var attribute in PropertyAttributes)
+                hash = hash * 31 + (attribute?.GetHashCode() ?? 0);
+            foreach (var propertyName in SubPropertyNotify)
+                hash = hash * 31 + (propertyName?.GetHashCode() ?? 0);
             foreach (var propertyName in AlsoNotify)
                 hash = hash * 31 + (propertyName?.GetHashCode() ?? 0);
             foreach (var commandName in CommandsToNotify)
