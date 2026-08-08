@@ -269,6 +269,26 @@ field mode remains available for older language versions. See the
 [design proof](docs/design/partial-properties.md) and
 [`PartialPropertyTests`](tests/NotifyGen.Tests/PartialPropertyTests.cs).
 
+### Property Metadata Forwarding
+
+Attributes on an eligible field that are valid for properties are copied to the
+generated property. This keeps validation, serialization, and binding metadata
+attached without making NotifyGen implement those frameworks:
+
+```csharp
+[Notify]
+public partial class Person
+{
+    [System.ComponentModel.DataAnnotations.Required]
+    [System.Text.Json.Serialization.JsonPropertyName("displayName")]
+    private string _displayName = string.Empty;
+}
+```
+
+Field-only attributes and NotifyGen control attributes are not copied. See the
+[metadata design](docs/design/property-metadata-forwarding.md) and
+[`PropertyMetadataTests`](tests/NotifyGen.Tests/PropertyMetadataTests.cs).
+
 ### What Fields Are Eligible?
 
 NotifyGen generates properties only for mutable, private instance fields with an underscore prefix. The `private` modifier may be explicit or implicit. Here's what works and what doesn't:
@@ -854,6 +874,7 @@ dotnet run -c Release --project benchmarks/NotifyGen.Benchmarks -- --filter *Com
 | Build impact | Runs during compile | Post-build step | Runs during compile |
 | Equality checks | Always built-in | Configurable | Opt-in with attribute |
 | Partial properties | ✅ C# 14/preview | ❌ Weaves existing properties | ✅ C# 14/preview |
+| Property metadata forwarding | ✅ Property-targetable field attributes | ✅ Existing property metadata | ✅ Property/accessor metadata |
 | Partial hooks | `OnXxxChanging` + `OnXxxChanged` | Intercept methods | `OnXxxChanging` only |
 | INotifyPropertyChanging | ✅ `ImplementChanging = true` | ✅ Built-in | ✅ Separate attribute |
 | Command CanExecute refresh | ✅ `[NotifyCanExecuteChangedFor]` | ❌ Manual | ✅ `[NotifyCanExecuteChangedFor]` |

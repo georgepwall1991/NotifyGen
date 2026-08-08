@@ -25,6 +25,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     private const string NotifyCanExecuteChangedForAttributeName =
         "NotifyGen.NotifyCanExecuteChangedForAttribute";
     private const string NotifySuppressableAttributeName = "NotifyGen.NotifySuppressableAttribute";
+    private const string AttributeUsageAttributeName = "System.AttributeUsageAttribute";
 
     /// <summary>
     /// Cached SymbolDisplayFormat for type names to avoid repeated allocations.
@@ -36,6 +37,13 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes
             | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier
             | SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers
+    );
+
+    private static readonly SymbolDisplayFormat FullyQualifiedTypeDisplayFormat = new(
+        globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Included,
+        typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+        genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
+        miscellaneousOptions: SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers
     );
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
@@ -299,7 +307,8 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             commandsToNotify,
             setterAccess,
             isPrimitiveType,
-            requiresUnsafe
+            requiresUnsafe,
+            propertyAttributes: GetForwardedPropertyAttributes(field)
         );
     }
 
@@ -360,6 +369,142 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 type is INamedTypeSymbol namedType
                 && namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T
             );
+    }
+
+    /// <summary>
+    /// Gets source attributes that can legally be applied to a generated property.
+    /// </summary>
+    private static ImmutableArray<string> GetForwardedPropertyAttributes(IFieldSymbol field)
+    {
+        var forwarded = ImmutableArray.CreateBuilder<string>();
+        foreach (var attribute in field.GetAttributes())
+        {
+            if (
+                attribute.AttributeClass is not { } attributeClass
+                || attributeClass.ContainingNamespace.ToDisplayString() == "NotifyGen"
+                || !CanApplyToProperty(attributeClass)
+            )
+            {
+                continue;
+            }
+
+            forwarded.Add(FormatAttribute(attribute));
+        }
+
+        return forwarded.ToImmutable();
+    }
+
+    private static bool CanApplyToProperty(INamedTypeSymbol attributeClass)
+    {
+        var usage = attributeClass
+            .GetAttributes()
+            .FirstOrDefault(attribute =>
+                attribute.AttributeClass?.ToDisplayString() == AttributeUsageAttributeName
+            );
+
+        if (usage == null || usage.ConstructorArguments.Length == 0)
+            return true;
+
+        var targets = usage.ConstructorArguments[0].Value;
+        return targets is not null
+            && Convert.ToInt64(targets, System.Globalization.CultureInfo.InvariantCulture)
+                is var targetValue
+            && (((AttributeTargets)targetValue) & AttributeTargets.Property) != 0;
+    }
+
+    private static string FormatAttribute(AttributeData attribute)
+    {
+        var attributeType = attribute.AttributeClass!.ToDisplayString(
+            FullyQualifiedTypeDisplayFormat
+        );
+        var arguments = attribute
+            .ConstructorArguments
+            .Select(FormatTypedConstant)
+            .Concat(
+                attribute.NamedArguments.Select(named =>
+                    $"{named.Key} = {FormatTypedConstant(named.Value)}"
+                )
+            );
+        return $"[{attributeType}({string.Join(", ", arguments)})]";
+    }
+
+    private static string FormatTypedConstant(TypedConstant constant)
+    {
+        if (constant.IsNull)
+            return "null";
+
+        if (constant.Kind == TypedConstantKind.Array)
+        {
+            var arrayType = (IArrayTypeSymbol)constant.Type!;
+            return $"new {FormatType(arrayType.ElementType)}[] {{ {string.Join(", ", constant.Values.Select(FormatTypedConstant))} }}";
+        }
+
+        if (constant.Kind == TypedConstantKind.Type && constant.Value is ITypeSymbol type)
+            return $"typeof({FormatType(type)})";
+
+        if (constant.Kind == TypedConstantKind.Enum)
+        {
+            return $"({FormatType(constant.Type!)}){Convert.ToString(constant.Value, System.Globalization.CultureInfo.InvariantCulture)}";
+        }
+
+        return FormatPrimitive(constant.Value!);
+    }
+
+    private static string FormatType(ITypeSymbol type) =>
+        type.ToDisplayString(FullyQualifiedTypeDisplayFormat);
+
+    private static string FormatPrimitive(object value) =>
+        value switch
+        {
+            string text => QuoteString(text),
+            char character => QuoteChar(character),
+            bool boolean => boolean ? "true" : "false",
+            float single => single.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "F",
+            double doubleValue => doubleValue.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "D",
+            long longValue => longValue.ToString(System.Globalization.CultureInfo.InvariantCulture) + "L",
+            ulong ulongValue => ulongValue.ToString(System.Globalization.CultureInfo.InvariantCulture) + "UL",
+            uint uintValue => uintValue.ToString(System.Globalization.CultureInfo.InvariantCulture) + "U",
+            _ => Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture)!
+        };
+
+    private static string QuoteString(string value) => $"\"{Escape(value)}\"";
+
+    private static string QuoteChar(char value) => $"'{Escape(value.ToString())}'";
+
+    private static string Escape(string value)
+    {
+        var builder = new StringBuilder(value.Length + 8);
+        foreach (var character in value)
+        {
+            if (character == '\\')
+                builder.Append('\\').Append('\\');
+            else if (character == '"')
+                builder.Append('\\').Append('"');
+            else if (character == '\'')
+                builder.Append('\\').Append('\'');
+            else if (character == '\0')
+                builder.Append('\\').Append('0');
+            else if (character == '\a')
+                builder.Append('\\').Append('a');
+            else if (character == '\b')
+                builder.Append('\\').Append('b');
+            else if (character == '\f')
+                builder.Append('\\').Append('f');
+            else if (character == '\n')
+                builder.Append('\\').Append('n');
+            else if (character == '\r')
+                builder.Append('\\').Append('r');
+            else if (character == '\t')
+                builder.Append('\\').Append('t');
+            else if (character == '\v')
+                builder.Append('\\').Append('v');
+            else if (char.IsControl(character))
+                builder.Append("\\u").Append(((int)character).ToString("X4"));
+            else
+                builder.Append(character);
+        }
+
+        return builder.ToString();
     }
 
     /// <summary>
@@ -722,6 +867,11 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         bool implementChanging
     )
     {
+        foreach (var attribute in field.PropertyAttributes)
+        {
+            sb.AppendLine($"{indent}    {attribute}");
+        }
+
         if (field.IsPartialProperty && field.NeedsNullableBackingField)
         {
             sb.AppendLine(
