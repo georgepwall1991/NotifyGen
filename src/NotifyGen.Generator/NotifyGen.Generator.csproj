@@ -12,7 +12,7 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>NotifyGen</PackageId>
-    <Version>1.6.0</Version>
+    <Version>1.7.0</Version>
     <Authors>George Wall</Authors>
     <Title>NotifyGen - INotifyPropertyChanged Source Generator</Title>
     <Description>A fast INotifyPropertyChanged source generator for .NET. Eliminates MVVM boilerplate with a single [Notify] attribute, no runtime dependency, full IntelliSense, and debuggable generated code.
@@ -37,17 +37,10 @@ Features:
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>Unreleased (cycle 1):
+    <PackageReleaseNotes>v1.7.0:
 • Generate C# 14/preview partial properties from [Notify] without a runtime dependency
 • Support [NotifyAlso] on partial properties and reject ambiguous generated names with NOTIFY009
-• Expand transitive [NotifyAlso] dependencies with cycle diagnostics (NOTIFY008)
-
-v1.6.0:
-• Generate nested [Notify] classes safely across partial containing types
-• Add NOTIFY006 with a Make type partial code fix for containing declarations
-• Reject static, const, and readonly fields consistently before generation
-• Preserve generic syntax, modifiers, escaped identifiers, and collision-safe source hints
-• Report NOTIFY003 when [NotifyAlso] targets a property from an ineligible field</PackageReleaseNotes>
+• Expand transitive [NotifyAlso] dependencies with cycle diagnostics (NOTIFY008)</PackageReleaseNotes>
     <Copyright>Copyright (c) 2025-2026 George Wall</Copyright>
 
     <!-- Analyzer/Generator packaging -->

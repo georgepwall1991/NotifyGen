@@ -7,11 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-08-08
+
 ### Added
 
 - Generate C# 14/preview partial properties from the existing `[Notify]` class attribute, including old/new partial hooks and `[NotifyAlso]` targets, without a runtime dependency
 - Reject ambiguous generated property names with **NOTIFY009**
-
 - Transitive `[NotifyAlso]` closure now deduplicates reachable notifications and reports cycles with **NOTIFY008**
 
 ## [1.6.0] - 2026-07-26
