@@ -353,6 +353,14 @@ public partial class Rectangle
 
 When `Width` changes, `PropertyChanged` fires for `Width`, `Area`, and `Perimeter`.
 
+Dependencies may be chained. If `FirstName` notifies `DisplayName` and
+`DisplayName` notifies `SearchText`, changing `FirstName` raises all three
+names. A diamond is deduplicated, so each reachable name is raised once. A
+cycle is rejected at compile time with `NOTIFY008`, including the dependency
+path in the diagnostic instead of silently bounding the traversal. See the
+[transitive dependency proof](docs/design/notifyalso-transitive-cycles.md) and
+[`IntegrationTests.NotifyAlso_TransitiveChainAndDiamond_AreDeduplicated`](tests/NotifyGen.Tests/IntegrationTests.cs).
+
 ### Custom Property Names with `[NotifyName]`
 
 Override the default naming:
@@ -782,6 +790,7 @@ NotifyGen includes analyzers that catch mistakes at compile time:
 | NOTIFY005 | Info | Readonly field cannot generate a property with a setter | — |
 | NOTIFY006 | Error | A type containing a nested `[Notify]` class must be `partial` | Yes |
 | NOTIFY007 | Error | A `[Notify]` target or containing type has file-local accessibility | — |
+| NOTIFY008 | Error | `[NotifyAlso]` dependencies contain a cycle | — |
 | NOTIFY009 | Error | Multiple members would generate the same property name | — |
 
 **NOTIFY001 and NOTIFY006 have a code fix** — click the lightbulb (or press `Ctrl+.` / `Cmd+.`) and select "Make type partial" to add the required modifier.

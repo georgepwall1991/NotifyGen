@@ -9,6 +9,33 @@ namespace NotifyGen.Tests;
 public class PartialPropertyTests
 {
     [Fact]
+    public void PartialProperty_WithOtherAttributedDeclaration_IsGeneratedOnce()
+    {
+        const string source = """
+            using NotifyGen;
+            using System;
+
+            [Notify]
+            public partial class PlainEntity
+            {
+                public partial string Name { get; set; }
+            }
+
+            [Obsolete]
+            public partial class PlainEntity
+            {
+            }
+            """;
+
+        var result = GeneratorTestHelper.RunGeneratorWithLanguageVersionAndAssertCompiles(
+            source,
+            LanguageVersion.Preview
+        );
+
+        result.RunResult.Results.Single().GeneratedSources.Should().ContainSingle();
+    }
+
+    [Fact]
     public void PartialProperty_WithExistingImplementation_IsNotDuplicated()
     {
         const string source = """
@@ -56,9 +83,40 @@ public class PartialPropertyTests
     }
 
     [Fact]
+    public void PartialProperty_NotifyAlso_UsesTransitiveClosure()
+    {
+        const string source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class PartialChain
+            {
+                [NotifyAlso(nameof(DisplayName))]
+                public partial string? Name { get; set; }
+
+                [NotifyAlso(nameof(SearchText))]
+                public partial string? DisplayName { get; set; }
+
+                public partial string? SearchText { get; set; }
+            }
+            """;
+
+        var result = GeneratorTestHelper.RunGeneratorWithLanguageVersionAndAssertCompiles(
+            source,
+            LanguageVersion.Preview
+        );
+        var generated = GeneratorTestHelper.GetGeneratedSource(result.RunResult, "PartialChain.g.cs");
+
+        generated.Should().NotBeNull();
+        generated.Should().Contain("OnPropertyChanged(\"DisplayName\")");
+        generated.Should().Contain("OnPropertyChanged(\"SearchText\")");
+    }
+
+    [Fact]
     public void PartialProperty_GeneratesSourceAndRunsWithoutFrameworkBase()
     {
         const string source = """
+            #nullable disable
             using NotifyGen;
             using System;
 

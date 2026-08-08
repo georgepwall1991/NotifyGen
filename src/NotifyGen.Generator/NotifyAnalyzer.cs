@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -27,6 +28,7 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.ReadonlyField,
             DiagnosticDescriptors.ContainingTypeMustBePartial,
             DiagnosticDescriptors.FileLocalTypeNotSupported,
+            DiagnosticDescriptors.NotifyAlsoDependencyCycle,
             DiagnosticDescriptors.GeneratedPropertyNameCollision
         );
 
@@ -286,6 +288,7 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         }
 
         var allKnownProperties = existingProperties.Union(generatedMembers.Keys);
+        var edges = ImmutableArray.CreateBuilder<DependencyEdge>();
 
         foreach (var generatedMember in generatedMembers)
         {
@@ -311,14 +314,36 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                         )
                     );
                 }
+
+                if (generatedMembers.ContainsKey(propertyName!))
+                {
+                    edges.Add(
+                        new DependencyEdge(
+                            GetGeneratedPropertyName(generatedMember.Value),
+                            propertyName!,
+                            generatedMember.Value,
+                            attribute
+                        )
+                    );
+                }
             }
         }
+
+        ReportDependencyCycle(context, edges.ToImmutable());
     }
 
     private static IEnumerable<AttributeData> GetNotifyAlsoAttributes(ISymbol member) =>
         member
             .GetAttributes()
             .Where(a => a.AttributeClass?.ToDisplayString() == NotifyAlsoAttributeName);
+
+    private static string GetGeneratedPropertyName(ISymbol member) =>
+        member switch
+        {
+            IPropertySymbol property => property.Name,
+            IFieldSymbol field => GetPropertyName(field),
+            _ => member.Name,
+        };
 
     private static string GetPropertyName(IFieldSymbol field)
     {
@@ -336,6 +361,94 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         IPropertySymbol property,
         System.Threading.CancellationToken ct
     ) => PartialPropertyEligibility.IsSupported(property, ct);
+
+    private static void ReportDependencyCycle(
+        SyntaxNodeAnalysisContext context,
+        ImmutableArray<DependencyEdge> edges
+    )
+    {
+        var edgesBySource = edges
+            .GroupBy(edge => edge.Source)
+            .ToDictionary(group => group.Key, group => group.ToImmutableArray());
+        var colors = new Dictionary<string, int>(StringComparer.Ordinal);
+        var stack = new List<string>();
+
+        foreach (var source in edgesBySource.Keys.OrderBy(static name => name))
+        {
+            if (colors.ContainsKey(source))
+                continue;
+
+            if (Visit(source))
+                return;
+        }
+
+        bool Visit(string source)
+        {
+            colors[source] = 1;
+            stack.Add(source);
+
+            if (edgesBySource.TryGetValue(source, out var sourceEdges))
+            {
+                foreach (var edge in sourceEdges)
+                {
+                    if (colors.TryGetValue(edge.Target, out var targetColor))
+                    {
+                        if (targetColor == 1)
+                        {
+                            var cycleStart = stack.IndexOf(edge.Target);
+                            var cycle = stack
+                                .Skip(cycleStart)
+                                .Concat(new[] { edge.Target });
+                            var location = GetAttributeLocation(
+                                edge.Member,
+                                edge.Attribute,
+                                context.CancellationToken
+                            );
+                            context.ReportDiagnostic(
+                                Diagnostic.Create(
+                                    DiagnosticDescriptors.NotifyAlsoDependencyCycle,
+                                    location,
+                                    string.Join(" -> ", cycle)
+                                )
+                            );
+                            return true;
+                        }
+
+                        if (targetColor == 2)
+                            continue;
+                    }
+
+                    if (Visit(edge.Target))
+                        return true;
+                }
+            }
+
+            stack.RemoveAt(stack.Count - 1);
+            colors[source] = 2;
+            return false;
+        }
+    }
+
+    private readonly struct DependencyEdge
+    {
+        public string Source { get; }
+        public string Target { get; }
+        public ISymbol Member { get; }
+        public AttributeData Attribute { get; }
+
+        public DependencyEdge(
+            string source,
+            string target,
+            ISymbol member,
+            AttributeData attribute
+        )
+        {
+            Source = source;
+            Target = target;
+            Member = member;
+            Attribute = attribute;
+        }
+    }
 
     private static Location GetSymbolLocation(
         ISymbol symbol,

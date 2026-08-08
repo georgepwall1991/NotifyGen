@@ -80,6 +80,9 @@ contract. Commands, messaging, validation, navigation, and DI are not involved.
 - If a generated name collides with another generated member or an existing
   manual property, `NOTIFY009` identifies the collision and generation is
   withheld instead of throwing from the generator.
+- Non-nullable reference partial properties receive field-targeted nullable-flow
+  attributes and null-forgiving reads so strict nullable builds remain warning
+  clean without changing the declared property type.
 - No runtime dependency is added. No existing attribute is removed or
   renamed. Release notes must mention the additive `[NotifyAlso]` target
   expansion and partial-property syntax requirement.

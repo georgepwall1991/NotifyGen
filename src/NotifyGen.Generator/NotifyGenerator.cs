@@ -217,7 +217,63 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             return ImmutableArray<FieldInfo>.Empty;
         }
 
-        return directMembers;
+        var byPropertyName = directMembers.ToDictionary(static member => member.PropertyName);
+        var result = ImmutableArray.CreateBuilder<FieldInfo>(directMembers.Length);
+        foreach (var member in directMembers)
+        {
+            ct.ThrowIfCancellationRequested();
+            result.Add(
+                member.WithAlsoNotify(
+                    ExpandAlsoNotify(member.PropertyName, member.AlsoNotify, byPropertyName)
+                )
+            );
+        }
+
+        return result.ToImmutable();
+    }
+
+    private static ImmutableArray<string> ExpandAlsoNotify(
+        string sourcePropertyName,
+        ImmutableArray<string> directTargets,
+        IReadOnlyDictionary<string, FieldInfo> membersByPropertyName
+    )
+    {
+        var expanded = ImmutableArray.CreateBuilder<string>();
+        var visited = new HashSet<string>(StringComparer.Ordinal) { sourcePropertyName };
+
+        // Preserve the existing direct-edge order before walking newly discovered edges.
+        foreach (var target in directTargets)
+        {
+            if (visited.Add(target))
+                expanded.Add(target);
+        }
+
+        foreach (var target in directTargets)
+        {
+            AppendTransitiveAlsoNotify(target, expanded, visited, membersByPropertyName);
+        }
+
+        return expanded.ToImmutable();
+    }
+
+    private static void AppendTransitiveAlsoNotify(
+        string source,
+        ImmutableArray<string>.Builder expanded,
+        HashSet<string> visited,
+        IReadOnlyDictionary<string, FieldInfo> membersByPropertyName
+    )
+    {
+        if (!membersByPropertyName.TryGetValue(source, out var sourceMember))
+            return;
+
+        foreach (var target in sourceMember.AlsoNotify)
+        {
+            if (visited.Add(target))
+            {
+                expanded.Add(target);
+                AppendTransitiveAlsoNotify(target, expanded, visited, membersByPropertyName);
+            }
+        }
     }
 
     /// <summary>

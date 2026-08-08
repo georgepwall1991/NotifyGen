@@ -99,6 +99,19 @@ internal static class DiagnosticDescriptors
     );
 
     /// <summary>
+    /// NOTIFY008: NotifyAlso dependency graph contains a cycle.
+    /// </summary>
+    public static readonly DiagnosticDescriptor NotifyAlsoDependencyCycle = new(
+        id: "NOTIFY008",
+        title: "NotifyAlso dependency cycle",
+        messageFormat: "NotifyAlso dependency cycle detected: {0}. Break the cycle so property notifications have a finite dependency graph.",
+        category: "NotifyGen",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "A NotifyAlso dependency cycle cannot produce a deterministic finite notification closure."
+    );
+
+    /// <summary>
     /// NOTIFY009: Multiple members would generate the same property name.
     /// </summary>
     public static readonly DiagnosticDescriptor GeneratedPropertyNameCollision = new(

@@ -165,6 +165,106 @@ public class AnalyzerTests
     }
 
     [Fact]
+    public async Task Analyzer_NotifyAlsoCycle_ReportsErrorAtDependencyAttribute()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class Person
+                {
+                    [NotifyAlso(nameof(LastName))]
+                    private string _firstName = string.Empty;
+
+                    [NotifyAlso(nameof(FirstName))]
+                    private string _lastName = string.Empty;
+                }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = diagnostics.Should().ContainSingle(d => d.Id == "NOTIFY008").Subject;
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Error);
+        diagnostic.GetMessage().Should().Contain("FirstName").And.Contain("LastName");
+        SourceText.From(source).ToString(diagnostic.Location.SourceSpan)
+            .Should().Contain("NotifyAlso");
+    }
+
+    [Fact]
+    public async Task Analyzer_PartialPropertyCycle_ReportsError()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyAlso(nameof(DisplayName))]
+                public partial string? Name { get; set; }
+
+                [NotifyAlso(nameof(Name))]
+                public partial string? DisplayName { get; set; }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source, LanguageVersion.Preview);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == "NOTIFY008");
+    }
+
+    [Fact]
+    public async Task Analyzer_SplitPartialClass_ReportsCycleOnce()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyAlso(nameof(LastName))]
+                private string _firstName = string.Empty;
+            }
+
+            public partial class Person
+            {
+                [NotifyAlso(nameof(FirstName))]
+                private string _lastName = string.Empty;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == "NOTIFY008");
+    }
+
+    [Fact]
+    public async Task Analyzer_NotifyAlsoTransitiveChain_ReportsNoCycle()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyAlso(nameof(DisplayName))]
+                private string _firstName = string.Empty;
+
+                [NotifyAlso(nameof(SearchText))]
+                private string _displayName = string.Empty;
+
+                private string _searchText = string.Empty;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().NotContain(diagnostic => diagnostic.Id == "NOTIFY008");
+    }
+
+    [Fact]
     public async Task Analyzer_NotifyAlsoWithExistingProperty_ReportsNoDiagnostics()
     {
         // Arrange
@@ -1098,6 +1198,18 @@ public class AnalyzerTests
         var descriptor = DiagnosticDescriptors.GeneratedPropertyNameCollision;
 
         descriptor.Id.Should().Be("NOTIFY009");
+        descriptor.Title.ToString().Should().NotBeEmpty();
+        descriptor.Category.Should().Be("NotifyGen");
+        descriptor.DefaultSeverity.Should().Be(DiagnosticSeverity.Error);
+        descriptor.IsEnabledByDefault.Should().BeTrue();
+    }
+
+    [Fact]
+    public void DiagnosticDescriptors_NotifyAlsoDependencyCycle_HasCorrectProperties()
+    {
+        var descriptor = DiagnosticDescriptors.NotifyAlsoDependencyCycle;
+
+        descriptor.Id.Should().Be("NOTIFY008");
         descriptor.Title.ToString().Should().NotBeEmpty();
         descriptor.Category.Should().Be("NotifyGen");
         descriptor.DefaultSeverity.Should().Be(DiagnosticSeverity.Error);

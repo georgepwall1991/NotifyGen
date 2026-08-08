@@ -107,6 +107,23 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         GetterAccess = getterAccess;
     }
 
+    public FieldInfo WithAlsoNotify(ImmutableArray<string> alsoNotify) =>
+        new(
+            FieldName,
+            PropertyName,
+            TypeName,
+            IsNullable,
+            alsoNotify,
+            CommandsToNotify,
+            SetterAccess,
+            IsPrimitiveType,
+            RequiresUnsafe,
+            IsPartialProperty,
+            PropertyAccessibility,
+            NeedsNullableBackingField,
+            GetterAccess
+        );
+
     public bool Equals(FieldInfo other)
     {
         return FieldName == other.FieldName
