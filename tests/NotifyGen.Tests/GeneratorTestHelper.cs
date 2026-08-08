@@ -37,26 +37,50 @@ public static class GeneratorTestHelper
         GeneratorDriverRunResult RunResult
     ) RunGenerator(string source, bool allowUnsafe = false)
     {
-        // Create syntax tree
-        var syntaxTree = CSharpSyntaxTree.ParseText(source);
+        return RunGeneratorCore(source, LanguageVersion.Default, allowUnsafe);
+    }
 
-        // Create compilation with references
-        var references = References;
+    /// <summary>
+    /// Runs the generator with a specific C# language version.
+    /// </summary>
+    public static (
+        Compilation OutputCompilation,
+        ImmutableArray<Diagnostic> Diagnostics,
+        GeneratorDriverRunResult RunResult
+    ) RunGeneratorWithLanguageVersion(
+        string source,
+        LanguageVersion languageVersion,
+        bool allowUnsafe = false
+    )
+    {
+        return RunGeneratorCore(source, languageVersion, allowUnsafe);
+    }
+
+    private static (
+        Compilation OutputCompilation,
+        ImmutableArray<Diagnostic> Diagnostics,
+        GeneratorDriverRunResult RunResult
+    ) RunGeneratorCore(string source, LanguageVersion languageVersion, bool allowUnsafe)
+    {
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(languageVersion)
+        );
 
         var compilation = CSharpCompilation.Create(
             "TestAssembly",
             new[] { syntaxTree },
-            references,
+            References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
                 .WithNullableContextOptions(NullableContextOptions.Enable)
                 .WithAllowUnsafe(allowUnsafe)
         );
 
-        // Create generator driver
         var generator = new NotifyGenerator();
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
-
-        // Run generator
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            new[] { generator.AsSourceGenerator() },
+            parseOptions: new CSharpParseOptions(languageVersion)
+        );
         driver = driver.RunGeneratorsAndUpdateCompilation(
             compilation,
             out var outputCompilation,
@@ -76,7 +100,41 @@ public static class GeneratorTestHelper
         GeneratorDriverRunResult RunResult
     ) RunGeneratorAndAssertCompiles(string source, bool allowUnsafe = false)
     {
-        var result = RunGenerator(source, allowUnsafe);
+        return RunGeneratorAndAssertCompilesCore(
+            RunGenerator(source, allowUnsafe)
+        );
+    }
+
+    /// <summary>
+    /// Runs the generator with a language version and asserts that the output compiles.
+    /// </summary>
+    public static (
+        Compilation OutputCompilation,
+        ImmutableArray<Diagnostic> Diagnostics,
+        GeneratorDriverRunResult RunResult
+    ) RunGeneratorWithLanguageVersionAndAssertCompiles(
+        string source,
+        LanguageVersion languageVersion,
+        bool allowUnsafe = false
+    )
+    {
+        return RunGeneratorAndAssertCompilesCore(
+            RunGeneratorWithLanguageVersion(source, languageVersion, allowUnsafe)
+        );
+    }
+
+    private static (
+        Compilation OutputCompilation,
+        ImmutableArray<Diagnostic> Diagnostics,
+        GeneratorDriverRunResult RunResult
+    ) RunGeneratorAndAssertCompilesCore(
+        (
+            Compilation OutputCompilation,
+            ImmutableArray<Diagnostic> Diagnostics,
+            GeneratorDriverRunResult RunResult
+        ) result
+    )
+    {
         var errors = result
             .OutputCompilation.GetDiagnostics()
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)

@@ -12,7 +12,11 @@ namespace NotifyGen;
 /// private string _firstName;
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Field, Inherited = false, AllowMultiple = true)]
+[AttributeUsage(
+    AttributeTargets.Field | AttributeTargets.Property,
+    Inherited = false,
+    AllowMultiple = true
+)]
 public sealed class NotifyAlsoAttribute : Attribute
 {
     /// <summary>

@@ -56,6 +56,26 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
     /// </summary>
     public bool RequiresUnsafe { get; }
 
+    /// <summary>
+    /// Whether this metadata describes an incomplete partial property rather than a field.
+    /// </summary>
+    public bool IsPartialProperty { get; }
+
+    /// <summary>
+    /// The accessibility of the declared property.
+    /// </summary>
+    public string PropertyAccessibility { get; }
+
+    /// <summary>
+    /// Whether a partial property's synthesized field needs nullable-flow attributes.
+    /// </summary>
+    public bool NeedsNullableBackingField { get; }
+
+    /// <summary>
+    /// An explicit getter accessibility modifier, if any.
+    /// </summary>
+    public string? GetterAccess { get; }
+
     public FieldInfo(
         string fieldName,
         string propertyName,
@@ -65,7 +85,11 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         ImmutableArray<string> commandsToNotify,
         string? setterAccess = null,
         bool isPrimitiveType = false,
-        bool requiresUnsafe = false
+        bool requiresUnsafe = false,
+        bool isPartialProperty = false,
+        string propertyAccessibility = "public",
+        bool needsNullableBackingField = false,
+        string? getterAccess = null
     )
     {
         FieldName = fieldName;
@@ -77,7 +101,28 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         SetterAccess = setterAccess;
         IsPrimitiveType = isPrimitiveType;
         RequiresUnsafe = requiresUnsafe;
+        IsPartialProperty = isPartialProperty;
+        PropertyAccessibility = propertyAccessibility;
+        NeedsNullableBackingField = needsNullableBackingField;
+        GetterAccess = getterAccess;
     }
+
+    public FieldInfo WithAlsoNotify(ImmutableArray<string> alsoNotify) =>
+        new(
+            FieldName,
+            PropertyName,
+            TypeName,
+            IsNullable,
+            alsoNotify,
+            CommandsToNotify,
+            SetterAccess,
+            IsPrimitiveType,
+            RequiresUnsafe,
+            IsPartialProperty,
+            PropertyAccessibility,
+            NeedsNullableBackingField,
+            GetterAccess
+        );
 
     public bool Equals(FieldInfo other)
     {
@@ -88,6 +133,10 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             && SetterAccess == other.SetterAccess
             && IsPrimitiveType == other.IsPrimitiveType
             && RequiresUnsafe == other.RequiresUnsafe
+            && IsPartialProperty == other.IsPartialProperty
+            && PropertyAccessibility == other.PropertyAccessibility
+            && NeedsNullableBackingField == other.NeedsNullableBackingField
+            && GetterAccess == other.GetterAccess
             && AlsoNotify.SequenceEqual(other.AlsoNotify)
             && CommandsToNotify.SequenceEqual(other.CommandsToNotify);
     }
@@ -109,6 +158,10 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             hash = hash * 31 + (SetterAccess?.GetHashCode() ?? 0);
             hash = hash * 31 + IsPrimitiveType.GetHashCode();
             hash = hash * 31 + RequiresUnsafe.GetHashCode();
+            hash = hash * 31 + IsPartialProperty.GetHashCode();
+            hash = hash * 31 + (PropertyAccessibility?.GetHashCode() ?? 0);
+            hash = hash * 31 + NeedsNullableBackingField.GetHashCode();
+            hash = hash * 31 + (GetterAccess?.GetHashCode() ?? 0);
             foreach (var propertyName in AlsoNotify)
                 hash = hash * 31 + (propertyName?.GetHashCode() ?? 0);
             foreach (var commandName in CommandsToNotify)

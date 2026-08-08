@@ -56,6 +56,18 @@ public class IntegrationTests
     }
 
     [Fact]
+    public void NotifyAlso_TransitiveChainAndDiamond_AreDeduplicated()
+    {
+        var person = new TestPersonWithTransitiveDependencies();
+        var changedProperties = new List<string>();
+        person.PropertyChanged += (_, e) => changedProperties.Add(e.PropertyName!);
+
+        person.FirstName = "John";
+
+        changedProperties.Should().Equal("FirstName", "DisplayName", "SearchText", "Alias");
+    }
+
+    [Fact]
     public void PartialHook_IsCalled_WhenPropertyChanges()
     {
         // Arrange
@@ -406,6 +418,24 @@ public partial class TestPersonWithFullName
     private string _lastName = string.Empty;
 
     public string FullName => $"{FirstName} {LastName}";
+}
+
+/// <summary>
+/// Test class for transitive and diamond NotifyAlso dependencies.
+/// </summary>
+[Notify]
+public partial class TestPersonWithTransitiveDependencies
+{
+    [NotifyAlso(nameof(DisplayName))]
+    [NotifyAlso(nameof(SearchText))]
+    private string _firstName = string.Empty;
+
+    [NotifyAlso(nameof(SearchText))]
+    [NotifyAlso(nameof(Alias))]
+    private string _displayName = string.Empty;
+
+    private string _searchText = string.Empty;
+    private string _alias = string.Empty;
 }
 
 /// <summary>

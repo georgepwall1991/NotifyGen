@@ -184,6 +184,34 @@ public class GeneratorTests
     }
 
     [Fact]
+    public void Generator_WithNotifyAlsoCycle_EmitsBoundedNotifications()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyAlso(nameof(LastName))]
+                private string _firstName = string.Empty;
+
+                [NotifyAlso(nameof(FirstName))]
+                private string _lastName = string.Empty;
+            }
+            """;
+
+        var result = GeneratorTestHelper.RunGeneratorAndAssertCompiles(source);
+        var generatedSource = GeneratorTestHelper.GetGeneratedSource(
+            result.RunResult,
+            "Person.g.cs"
+        );
+
+        generatedSource.Should().NotBeNull();
+        generatedSource!.Split("OnPropertyChanged(\"FirstName\")").Length.Should().Be(2);
+        generatedSource.Split("OnPropertyChanged(\"LastName\")").Length.Should().Be(2);
+    }
+
+    [Fact]
     public void Generator_WithNoUnderscoredFields_GeneratesNoProperties()
     {
         // Arrange

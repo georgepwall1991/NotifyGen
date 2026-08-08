@@ -193,7 +193,7 @@ public class AttributeTests
 
         // Assert
         usageAttribute.Should().NotBeNull();
-        usageAttribute!.ValidOn.Should().Be(AttributeTargets.Field);
+        usageAttribute!.ValidOn.Should().Be(AttributeTargets.Field | AttributeTargets.Property);
         usageAttribute.Inherited.Should().BeFalse();
         usageAttribute.AllowMultiple.Should().BeTrue();
     }

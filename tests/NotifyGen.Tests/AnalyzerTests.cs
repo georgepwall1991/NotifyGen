@@ -93,6 +93,26 @@ public class AnalyzerTests
     }
 
     [Fact]
+    public async Task Analyzer_PartialPropertyNotifyAlsoWithUnknownProperty_ReportsWarning()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyAlso("MissingProperty")]
+                public partial string Name { get; set; }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source, LanguageVersion.Preview);
+
+        var diagnostic = diagnostics.Should().ContainSingle(d => d.Id == "NOTIFY003").Subject;
+        diagnostic.GetMessage().Should().Contain("Member 'Name'").And.Contain("MissingProperty");
+    }
+
+    [Fact]
     public async Task Analyzer_NotifyAlsoWithUnknownProperty_ReportsWarning()
     {
         // Arrange
@@ -119,6 +139,129 @@ public class AnalyzerTests
         diagnostic.Severity.Should().Be(DiagnosticSeverity.Warning);
         diagnostic.GetMessage().Should().Contain("_name");
         diagnostic.GetMessage().Should().Contain("NonExistentProperty");
+    }
+
+    [Fact]
+    public async Task Analyzer_GeneratedPropertyNameCollision_ReportsError()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyName("Name")]
+                private string _firstName = string.Empty;
+
+                public string Name => FirstName;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = diagnostics.Should().ContainSingle(d => d.Id == "NOTIFY009").Subject;
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Error);
+        diagnostic.GetMessage().Should().Contain("Name");
+    }
+
+    [Fact]
+    public async Task Analyzer_NotifyAlsoCycle_ReportsErrorAtDependencyAttribute()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class Person
+                {
+                    [NotifyAlso(nameof(LastName))]
+                    private string _firstName = string.Empty;
+
+                    [NotifyAlso(nameof(FirstName))]
+                    private string _lastName = string.Empty;
+                }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = diagnostics.Should().ContainSingle(d => d.Id == "NOTIFY008").Subject;
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Error);
+        diagnostic.GetMessage().Should().Contain("FirstName").And.Contain("LastName");
+        SourceText.From(source).ToString(diagnostic.Location.SourceSpan)
+            .Should().Contain("NotifyAlso");
+    }
+
+    [Fact]
+    public async Task Analyzer_PartialPropertyCycle_ReportsError()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyAlso(nameof(DisplayName))]
+                public partial string? Name { get; set; }
+
+                [NotifyAlso(nameof(Name))]
+                public partial string? DisplayName { get; set; }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source, LanguageVersion.Preview);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == "NOTIFY008");
+    }
+
+    [Fact]
+    public async Task Analyzer_SplitPartialClass_ReportsCycleOnce()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyAlso(nameof(LastName))]
+                private string _firstName = string.Empty;
+            }
+
+            public partial class Person
+            {
+                [NotifyAlso(nameof(FirstName))]
+                private string _lastName = string.Empty;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == "NOTIFY008");
+    }
+
+    [Fact]
+    public async Task Analyzer_NotifyAlsoTransitiveChain_ReportsNoCycle()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyAlso(nameof(DisplayName))]
+                private string _firstName = string.Empty;
+
+                [NotifyAlso(nameof(SearchText))]
+                private string _displayName = string.Empty;
+
+                private string _searchText = string.Empty;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().NotContain(diagnostic => diagnostic.Id == "NOTIFY008");
     }
 
     [Fact]
@@ -622,10 +765,14 @@ public class AnalyzerTests
 
     private static CSharpCompilation CreateCompilation(
         string source,
-        IEnumerable<MetadataReference> references
+        IEnumerable<MetadataReference> references,
+        LanguageVersion languageVersion = LanguageVersion.Default
     )
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText(source);
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(languageVersion)
+        );
         return CSharpCompilation.Create(
             "TestAssembly",
             new[] { syntaxTree },
@@ -636,10 +783,13 @@ public class AnalyzerTests
         );
     }
 
-    private static async Task<IReadOnlyList<Diagnostic>> GetDiagnosticsAsync(string source)
+    private static async Task<IReadOnlyList<Diagnostic>> GetDiagnosticsAsync(
+        string source,
+        LanguageVersion languageVersion = LanguageVersion.Default
+    )
     {
         var references = GetRequiredReferences();
-        var compilation = CreateCompilation(source, references);
+        var compilation = CreateCompilation(source, references, languageVersion);
 
         var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new NotifyAnalyzer());
         var compilationWithAnalyzers = compilation.WithAnalyzers(analyzers);
@@ -1039,6 +1189,30 @@ public class AnalyzerTests
         descriptor.Title.ToString().Should().NotBeEmpty();
         descriptor.Category.Should().Be("NotifyGen");
         descriptor.DefaultSeverity.Should().Be(DiagnosticSeverity.Warning);
+        descriptor.IsEnabledByDefault.Should().BeTrue();
+    }
+
+    [Fact]
+    public void DiagnosticDescriptors_GeneratedPropertyNameCollision_HasCorrectProperties()
+    {
+        var descriptor = DiagnosticDescriptors.GeneratedPropertyNameCollision;
+
+        descriptor.Id.Should().Be("NOTIFY009");
+        descriptor.Title.ToString().Should().NotBeEmpty();
+        descriptor.Category.Should().Be("NotifyGen");
+        descriptor.DefaultSeverity.Should().Be(DiagnosticSeverity.Error);
+        descriptor.IsEnabledByDefault.Should().BeTrue();
+    }
+
+    [Fact]
+    public void DiagnosticDescriptors_NotifyAlsoDependencyCycle_HasCorrectProperties()
+    {
+        var descriptor = DiagnosticDescriptors.NotifyAlsoDependencyCycle;
+
+        descriptor.Id.Should().Be("NOTIFY008");
+        descriptor.Title.ToString().Should().NotBeEmpty();
+        descriptor.Category.Should().Be("NotifyGen");
+        descriptor.DefaultSeverity.Should().Be(DiagnosticSeverity.Error);
         descriptor.IsEnabledByDefault.Should().BeTrue();
     }
 
