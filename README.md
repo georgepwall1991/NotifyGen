@@ -285,7 +285,9 @@ public partial class Person
 }
 ```
 
-Field-only attributes and NotifyGen control attributes are not copied. See the
+Field-only attributes and NotifyGen control attributes are not copied. File-local
+attribute types (or file-local types used as attribute arguments) are skipped
+because generated source is a separate file. See the
 [metadata design](docs/design/property-metadata-forwarding.md) and
 [`PropertyMetadataTests`](tests/NotifyGen.Tests/PropertyMetadataTests.cs).
 
@@ -380,6 +382,38 @@ cycle is rejected at compile time with `NOTIFY008`, including the dependency
 path in the diagnostic instead of silently bounding the traversal. See the
 [transitive dependency proof](docs/design/notifyalso-transitive-cycles.md) and
 [`IntegrationTests.NotifyAlso_TransitiveChainAndDiamond_AreDeduplicated`](tests/NotifyGen.Tests/IntegrationTests.cs).
+
+### Child Property Notifications with `NotifyOnSubPropertyChanged`
+
+For a computed property that depends on a child object's changes, opt in on the
+existing `[NotifyAlso]` attribute:
+
+```csharp
+[Notify]
+public partial class CustomerViewModel
+{
+    [NotifyAlso(nameof(DisplayName), NotifyOnSubPropertyChanged = true)]
+    private Address? _address;
+
+    public string DisplayName => Address?.City ?? string.Empty;
+}
+
+public sealed class Address : INotifyPropertyChanged
+{
+    public string City { get; set; } = string.Empty;
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
+```
+
+NotifyGen subscribes to the child's ordinary `INotifyPropertyChanged` event,
+detaches the old value when `Address` is replaced, and raises `DisplayName` for
+any child change. Tracking starts when the generated source property is first
+accessed or assigned; source generators cannot inject initialization into every
+user constructor. The option is direct and explicit: it does not inspect getter
+expressions, traverse arbitrary object graphs, or subscribe to collections.
+`NOTIFY010` warns when the source type is not a reference value implementing
+`INotifyPropertyChanged`. See the [design proof](docs/design/notifyalso-subproperty.md)
+and [`SubPropertyNotificationTests`](tests/NotifyGen.Tests/SubPropertyNotificationTests.cs).
 
 ### Custom Property Names with `[NotifyName]`
 
@@ -812,6 +846,7 @@ NotifyGen includes analyzers that catch mistakes at compile time:
 | NOTIFY007 | Error | A `[Notify]` target or containing type has file-local accessibility | — |
 | NOTIFY008 | Error | `[NotifyAlso]` dependencies contain a cycle | — |
 | NOTIFY009 | Error | Multiple members would generate the same property name | — |
+| NOTIFY010 | Warning | `NotifyOnSubPropertyChanged` requires a reference child implementing `INotifyPropertyChanged` | — |
 
 **NOTIFY001 and NOTIFY006 have a code fix** — click the lightbulb (or press `Ctrl+.` / `Cmd+.`) and select "Make type partial" to add the required modifier.
 
@@ -875,6 +910,7 @@ dotnet run -c Release --project benchmarks/NotifyGen.Benchmarks -- --filter *Com
 | Equality checks | Always built-in | Configurable | Opt-in with attribute |
 | Partial properties | ✅ C# 14/preview | ❌ Weaves existing properties | ✅ C# 14/preview |
 | Property metadata forwarding | ✅ Property-targetable field attributes | ✅ Existing property metadata | ✅ Property/accessor metadata |
+| Child property notifications | ✅ Opt-in BCL subscription | ✅ Weaving support varies | Runtime/reactive APIs |
 | Partial hooks | `OnXxxChanging` + `OnXxxChanged` | Intercept methods | `OnXxxChanging` only |
 | INotifyPropertyChanging | ✅ `ImplementChanging = true` | ✅ Built-in | ✅ Separate attribute |
 | Command CanExecute refresh | ✅ `[NotifyCanExecuteChangedFor]` | ❌ Manual | ✅ `[NotifyCanExecuteChangedFor]` |

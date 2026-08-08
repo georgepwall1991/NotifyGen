@@ -20,6 +20,16 @@ public class AttributeTests
     }
 
     [Fact]
+    public void NotifyAlsoAttribute_NotifyOnSubPropertyChanged_DefaultsFalseAndCanBeEnabled()
+    {
+        var attribute = new NotifyAlsoAttribute("DisplayName");
+
+        attribute.NotifyOnSubPropertyChanged.Should().BeFalse();
+        attribute.NotifyOnSubPropertyChanged = true;
+        attribute.NotifyOnSubPropertyChanged.Should().BeTrue();
+    }
+
+    [Fact]
     public void NotifyAlsoAttribute_Constructor_WithNull_ThrowsArgumentNullException()
     {
         // Arrange & Act

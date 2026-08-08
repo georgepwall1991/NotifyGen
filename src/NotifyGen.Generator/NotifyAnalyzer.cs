@@ -29,7 +29,8 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.ContainingTypeMustBePartial,
             DiagnosticDescriptors.FileLocalTypeNotSupported,
             DiagnosticDescriptors.NotifyAlsoDependencyCycle,
-            DiagnosticDescriptors.GeneratedPropertyNameCollision
+            DiagnosticDescriptors.GeneratedPropertyNameCollision,
+            DiagnosticDescriptors.NotifyAlsoSubPropertyRequiresInpc
         );
 
     public override void Initialize(AnalysisContext context)
@@ -288,6 +289,9 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         }
 
         var allKnownProperties = existingProperties.Union(generatedMembers.Keys);
+        var inpcType = context.SemanticModel.Compilation.GetTypeByMetadataName(
+            "System.ComponentModel.INotifyPropertyChanged"
+        );
         var edges = ImmutableArray.CreateBuilder<DependencyEdge>();
 
         foreach (var generatedMember in generatedMembers)
@@ -297,6 +301,24 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                 var propertyName = attribute.ConstructorArguments.FirstOrDefault().Value as string;
                 if (string.IsNullOrEmpty(propertyName))
                     continue;
+
+                if (
+                    RequestsSubPropertyNotification(attribute)
+                    && !MemberImplementsInpc(generatedMember.Value, inpcType)
+                )
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.NotifyAlsoSubPropertyRequiresInpc,
+                            GetAttributeLocation(
+                                generatedMember.Value,
+                                attribute,
+                                context.CancellationToken
+                            ),
+                            generatedMember.Value.Name
+                        )
+                    );
+                }
 
                 if (!allKnownProperties.Contains(propertyName!))
                 {
@@ -330,6 +352,44 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         }
 
         ReportDependencyCycle(context, edges.ToImmutable());
+    }
+
+    private static bool RequestsSubPropertyNotification(AttributeData attribute) =>
+        attribute.NamedArguments.Any(named =>
+            named.Key == "NotifyOnSubPropertyChanged"
+            && named.Value.Value is true
+        );
+
+    private static bool MemberImplementsInpc(ISymbol member, INamedTypeSymbol? inpcType)
+    {
+        if (inpcType == null)
+            return false;
+
+        var type = member switch
+        {
+            IFieldSymbol field => field.Type,
+            IPropertySymbol property => property.Type,
+            _ => null,
+        };
+        if (type == null)
+            return false;
+
+        if (type is INamedTypeSymbol namedType)
+        {
+            return namedType.IsReferenceType
+                && (
+                    SymbolEqualityComparer.Default.Equals(namedType, inpcType)
+                    || namedType.AllInterfaces.Contains(inpcType, SymbolEqualityComparer.Default)
+                );
+        }
+
+        return type is ITypeParameterSymbol typeParameter
+            && typeParameter.HasReferenceTypeConstraint
+            && typeParameter.ConstraintTypes.Any(constraint =>
+                SymbolEqualityComparer.Default.Equals(constraint, inpcType)
+                || constraint is INamedTypeSymbol namedConstraint
+                    && namedConstraint.AllInterfaces.Contains(inpcType, SymbolEqualityComparer.Default)
+            );
     }
 
     private static IEnumerable<AttributeData> GetNotifyAlsoAttributes(ISymbol member) =>
