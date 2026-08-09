@@ -163,4 +163,69 @@ internal static class DiagnosticDescriptors
         description: "NotifyFrom=true declares an explicit source-to-target dependency; child tracking must remain on the generated source member."
     );
 
+    /// <summary>
+    /// NOTIFY013: Existing INPC host has no compatible invocation method.
+    /// </summary>
+    public static readonly DiagnosticDescriptor ExistingInpcRequiresInvoker = new(
+        id: "NOTIFY013",
+        title: "Existing INPC host has no compatible invoker",
+        messageFormat: "Type '{0}' implements INotifyPropertyChanged but has no accessible instance OnPropertyChanged(string) or OnPropertyChanged(PropertyChangedEventArgs) method. NotifyGen cannot safely emit property notifications.",
+        category: "NotifyGen",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "When a type reuses an existing INotifyPropertyChanged implementation, generated setters require an accessible ordinary OnPropertyChanged invoker."
+    );
+
+    /// <summary>
+    /// NOTIFY014: Target-side collection tracking is unsupported.
+    /// </summary>
+    public static readonly DiagnosticDescriptor NotifyAlsoTargetCollectionUnsupported = new(
+        id: "NOTIFY014",
+        title: "Target-side NotifyAlso cannot track collection changes",
+        messageFormat: "Target-side NotifyAlso on '{0}' cannot use NotifyOnCollectionChanged. Put collection tracking on the generated collection source member instead.",
+        category: "NotifyGen",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "NotifyFrom=true declares a dependency edge; collection tracking is source-side because it requires subscribing to the generated collection property."
+    );
+
+    /// <summary>
+    /// NOTIFY015: Collection tracking requires a reference source.
+    /// </summary>
+    public static readonly DiagnosticDescriptor NotifyAlsoCollectionRequiresReference = new(
+        id: "NOTIFY015",
+        title: "Collection tracking requires a reference value",
+        messageFormat: "Member '{0}' opts into NotifyOnCollectionChanged, but its type is not a reference value. CollectionChanged cannot be observed.",
+        category: "NotifyGen",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "NotifyOnCollectionChanged uses a runtime INotifyCollectionChanged subscription and therefore requires a reference-valued source."
+    );
+
+    /// <summary>
+    /// NOTIFY016: Generated property name is not a C# identifier.
+    /// </summary>
+    public static readonly DiagnosticDescriptor InvalidGeneratedPropertyName = new(
+        id: "NOTIFY016",
+        title: "Generated property name is invalid",
+        messageFormat: "Member '{0}' requests generated property name '{1}', which is not a valid C# identifier. Generation is skipped for this member.",
+        category: "NotifyGen",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "NotifyGen cannot emit a property whose requested name is not a valid C# identifier."
+    );
+
+    /// <summary>
+    /// NOTIFY017: Existing INPC changing host has no compatible invocation method.
+    /// </summary>
+    public static readonly DiagnosticDescriptor ExistingInpcChangingRequiresInvoker = new(
+        id: "NOTIFY017",
+        title: "Existing INPC changing host has no compatible invoker",
+        messageFormat: "Type '{0}' implements INotifyPropertyChanging but has no accessible instance OnPropertyChanging(string) or OnPropertyChanging(PropertyChangingEventArgs) method. NotifyGen cannot safely emit changing notifications.",
+        category: "NotifyGen",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "When a type reuses an existing INotifyPropertyChanging implementation, generated setters require an accessible ordinary OnPropertyChanging invoker."
+    );
+
 }

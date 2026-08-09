@@ -34,6 +34,12 @@ public sealed class NotifyAlsoAttribute : Attribute
     public bool NotifyOnSubPropertyChanged { get; set; }
 
     /// <summary>
+    /// Gets or sets whether changes to the collection membership should notify
+    /// <see cref="PropertyName"/>. Only direct INotifyCollectionChanged values are tracked.
+    /// </summary>
+    public bool NotifyOnCollectionChanged { get; set; }
+
+    /// <summary>
     /// Gets or sets whether this declaration is placed on the dependent target
     /// and names the source property that should trigger it.
     /// </summary>

@@ -943,6 +943,142 @@ public class AnalyzerTests
         );
     }
 
+    [Fact]
+    public async Task Analyzer_ExistingInpcWithoutCallableInvoker_ReportsNotify013()
+    {
+        var source = """
+            using System.ComponentModel;
+            using NotifyGen;
+
+            public abstract class Base : INotifyPropertyChanged
+            {
+                event PropertyChangedEventHandler? INotifyPropertyChanged.PropertyChanged
+                {
+                    add { }
+                    remove { }
+                }
+            }
+
+            [Notify]
+            public partial class Person : Base
+            {
+                private string _name = string.Empty;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == "NOTIFY013");
+    }
+
+    [Fact]
+    public async Task Analyzer_KeywordNotifyName_ReportsNotify016()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyName("class")]
+                private string _name = string.Empty;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == "NOTIFY016");
+    }
+
+    [Fact]
+    public async Task Analyzer_ExistingInpcChangingWithoutCallableInvoker_ReportsNotify017()
+    {
+        var source = """
+            using System.ComponentModel;
+            using NotifyGen;
+
+            public abstract class Base : INotifyPropertyChanging
+            {
+                event PropertyChangingEventHandler? INotifyPropertyChanging.PropertyChanging
+                {
+                    add { }
+                    remove { }
+                }
+            }
+
+            [Notify(ImplementChanging = true)]
+            public partial class Person : Base
+            {
+                private string _name = string.Empty;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == "NOTIFY017");
+    }
+
+    [Fact]
+    public async Task Analyzer_TargetSideCollectionTracking_ReportsNotify014()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyAlso(nameof(Name), NotifyFrom = true, NotifyOnCollectionChanged = true)]
+                private string _displayName = string.Empty;
+
+                private string _name = string.Empty;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == "NOTIFY014");
+    }
+
+    [Fact]
+    public async Task Analyzer_ValueCollectionTracking_ReportsNotify015()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyAlso(nameof(Display), NotifyOnCollectionChanged = true)]
+                private int _count;
+
+                public int Display => Count;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == "NOTIFY015");
+    }
+
+    [Fact]
+    public async Task Analyzer_InvalidNotifyName_ReportsNotify016()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyName(" ")]
+                private string _name = string.Empty;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == "NOTIFY016");
+    }
+
     private static async Task<IReadOnlyList<Diagnostic>> GetDiagnosticsAsync(
         string source,
         LanguageVersion languageVersion = LanguageVersion.Default

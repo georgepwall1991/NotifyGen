@@ -12,7 +12,7 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>NotifyGen</PackageId>
-    <Version>1.9.0</Version>
+    <Version>1.10.0</Version>
     <Authors>George Wall</Authors>
     <Title>NotifyGen - INotifyPropertyChanged Source Generator</Title>
     <Description>A fast INotifyPropertyChanged source generator for .NET. Eliminates MVVM boilerplate with a single [Notify] attribute, no runtime dependency, full IntelliSense, and debuggable generated code.
@@ -21,7 +21,8 @@ Features:
 • Auto-generates properties with PropertyChanged notifications
 • Built-in equality guards prevent redundant events
 • Partial hooks: On{Property}Changing(oldValue, newValue) and On{Property}Changed()
-• [NotifyAlso] for dependent properties
+• [NotifyAlso] for dependent properties, child changes, and collection membership
+• Reuse existing INPC host invokers without duplicate events or runtime dependencies
 • [NotifySetter] for access control (private, protected, internal)
 • INotifyPropertyChanging support for undo/redo scenarios
 • [NotifyCanExecuteChangedFor] for automatic command refresh
@@ -37,7 +38,12 @@ Features:
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>v1.9.0:
+    <PackageReleaseNotes>v1.10.0:
+• Reuse accessible existing INPC and INPC-changing host invokers without duplicate interfaces, events, or helpers
+• Add direct NotifyOnCollectionChanged membership tracking with replacement/null detach handling and target deduplication
+• Add NOTIFY013-NOTIFY017 safety diagnostics for incompatible hosts, collection declarations, and invalid generated names
+
+v1.9.0:
 • Add explicit target-side [NotifyAlso(NotifyFrom = true)] dependency declarations with transitive graph validation
 • Add typed On{Property}Changed(oldValue, newValue) post-change hooks with equality suppression and field/partial-property support
 

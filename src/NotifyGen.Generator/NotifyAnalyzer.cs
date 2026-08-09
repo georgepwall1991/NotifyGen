@@ -32,7 +32,12 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.GeneratedPropertyNameCollision,
             DiagnosticDescriptors.NotifyAlsoSubPropertyRequiresInpc,
             DiagnosticDescriptors.NotifyAlsoTargetRequiresGeneratedSource,
-            DiagnosticDescriptors.NotifyAlsoTargetSubPropertyUnsupported
+            DiagnosticDescriptors.NotifyAlsoTargetSubPropertyUnsupported,
+            DiagnosticDescriptors.ExistingInpcRequiresInvoker,
+            DiagnosticDescriptors.NotifyAlsoTargetCollectionUnsupported,
+            DiagnosticDescriptors.NotifyAlsoCollectionRequiresReference,
+            DiagnosticDescriptors.InvalidGeneratedPropertyName,
+            DiagnosticDescriptors.ExistingInpcChangingRequiresInvoker
         );
 
     public override void Initialize(AnalysisContext context)
@@ -144,6 +149,73 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         AnalyzeFieldEligibility(context, classSymbol, classDeclaration);
         AnalyzeGeneratedPropertyNameCollisions(context, classSymbol, classDeclaration);
         AnalyzeNotifyAlsoReferences(context, classSymbol);
+        AnalyzeExistingInpcHost(context, classSymbol, classDeclaration);
+        AnalyzeExistingInpcChangingHost(context, classSymbol, classDeclaration, notifyAttribute);
+    }
+
+    private static void AnalyzeExistingInpcHost(
+        SyntaxNodeAnalysisContext context,
+        INamedTypeSymbol classSymbol,
+        ClassDeclarationSyntax classDeclaration
+    )
+    {
+        var inpcType = context.SemanticModel.Compilation.GetTypeByMetadataName(
+            "System.ComponentModel.INotifyPropertyChanged"
+        );
+        if (
+            inpcType is null
+            || !classSymbol.AllInterfaces.Contains(inpcType, SymbolEqualityComparer.Default)
+            || PropertyChangedInvoker.Find(classSymbol) != PropertyChangedInvokerKind.None
+        )
+        {
+            return;
+        }
+
+        context.ReportDiagnostic(
+            Diagnostic.Create(
+                DiagnosticDescriptors.ExistingInpcRequiresInvoker,
+                classDeclaration.Identifier.GetLocation(),
+                classSymbol.Name
+            )
+        );
+    }
+
+    private static void AnalyzeExistingInpcChangingHost(
+        SyntaxNodeAnalysisContext context,
+        INamedTypeSymbol classSymbol,
+        ClassDeclarationSyntax classDeclaration,
+        AttributeData notifyAttribute
+    )
+    {
+        var implementChanging = notifyAttribute.NamedArguments.Any(named =>
+            named.Key == "ImplementChanging" && named.Value.Value is true
+        );
+        if (!implementChanging)
+            return;
+
+        var inpcChangingType = context.SemanticModel.Compilation.GetTypeByMetadataName(
+            "System.ComponentModel.INotifyPropertyChanging"
+        );
+        if (
+            inpcChangingType is null
+            || !classSymbol.AllInterfaces.Contains(
+                inpcChangingType,
+                SymbolEqualityComparer.Default
+            )
+            || PropertyChangingInvoker.Find(classSymbol)
+                != PropertyChangingInvokerKind.None
+        )
+        {
+            return;
+        }
+
+        context.ReportDiagnostic(
+            Diagnostic.Create(
+                DiagnosticDescriptors.ExistingInpcChangingRequiresInvoker,
+                classDeclaration.Identifier.GetLocation(),
+                classSymbol.Name
+            )
+        );
     }
 
     private static void AnalyzeFieldEligibility(
@@ -161,6 +233,18 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             {
                 case FieldEligibility.Eligible:
                     hasEligibleMembers = true;
+                    var propertyName = GetPropertyName(field);
+                    if (!GeneratedPropertyNameValidation.IsValid(propertyName))
+                    {
+                        context.ReportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.InvalidGeneratedPropertyName,
+                                GetSymbolLocation(field, classDeclaration, context.CancellationToken),
+                                field.Name,
+                                propertyName
+                            )
+                        );
+                    }
                     break;
                 case FieldEligibility.StaticOrConst:
                     context.ReportDiagnostic(
@@ -225,7 +309,10 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                 _ => null,
             };
 
-            if (propertyName == null)
+            if (
+                propertyName == null
+                || !GeneratedPropertyNameValidation.IsValid(propertyName)
+            )
                 continue;
 
             if (generatedNames.ContainsKey(propertyName))
@@ -281,7 +368,9 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             if (FieldEligibilityClassifier.Classify(field) != FieldEligibility.Eligible)
                 continue;
 
-            generatedMembers[GetPropertyName(field)] = field;
+            var propertyName = GetPropertyName(field);
+            if (GeneratedPropertyNameValidation.IsValid(propertyName))
+                generatedMembers[propertyName] = field;
         }
 
         foreach (var property in classSymbol.GetMembers().OfType<IPropertySymbol>())
@@ -323,6 +412,30 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                     attribute,
                     context.CancellationToken
                 );
+
+                if (RequestsCollectionNotification(attribute))
+                {
+                    if (notifyFrom)
+                    {
+                        context.ReportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.NotifyAlsoTargetCollectionUnsupported,
+                                location,
+                                targetName
+                            )
+                        );
+                    }
+                    else if (!MemberHasReferenceType(generatedMember.Value))
+                    {
+                        context.ReportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.NotifyAlsoCollectionRequiresReference,
+                                location,
+                                generatedMember.Value.Name
+                            )
+                        );
+                    }
+                }
 
                 if (notifyFrom && RequestsSubPropertyNotification(attribute))
                 {
@@ -406,6 +519,25 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         }
 
         ReportDependencyCycle(context, edges.ToImmutable());
+    }
+
+    private static bool RequestsCollectionNotification(AttributeData attribute) =>
+        attribute.NamedArguments.Any(named =>
+            named.Key == "NotifyOnCollectionChanged" && named.Value.Value is true
+        );
+
+    private static bool MemberHasReferenceType(ISymbol member)
+    {
+        var type = member switch
+        {
+            IFieldSymbol field => field.Type,
+            IPropertySymbol property => property.Type,
+            _ => null,
+        };
+        return type is INamedTypeSymbol namedType
+            ? namedType.IsReferenceType
+            : type is ITypeParameterSymbol typeParameter
+                && typeParameter.HasReferenceTypeConstraint;
     }
 
     private static bool RequestsSubPropertyNotification(AttributeData attribute) =>

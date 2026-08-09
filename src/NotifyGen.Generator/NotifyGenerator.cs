@@ -153,6 +153,10 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             inpcInterface != null
             && classSymbol.AllInterfaces.Contains(inpcInterface, SymbolEqualityComparer.Default);
 
+        var propertyChangedInvoker = alreadyImplementsInpc
+            ? PropertyChangedInvoker.Find(classSymbol)
+            : PropertyChangedInvokerKind.Generated;
+
         var inpcChangingInterface = semanticModel.Compilation.GetTypeByMetadataName(
             "System.ComponentModel.INotifyPropertyChanging"
         );
@@ -162,6 +166,9 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 inpcChangingInterface,
                 SymbolEqualityComparer.Default
             );
+        var propertyChangingInvoker = alreadyImplementsInpcChanging
+            ? PropertyChangingInvoker.Find(classSymbol)
+            : PropertyChangingInvokerKind.Generated;
 
         var containingNamespace = classSymbol.ContainingNamespace;
         var namespaceName = containingNamespace.IsGlobalNamespace
@@ -172,7 +179,9 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             namespaceName,
             typeDeclarations,
             alreadyImplementsInpc,
+            propertyChangedInvoker,
             alreadyImplementsInpcChanging,
+            propertyChangingInvoker,
             implementChanging,
             isSuppressable,
             alwaysNotifyProperties,
@@ -198,9 +207,17 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 && FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible
             )
             {
-                members.Add(CreateFieldInfo(field, ct));
+                if (
+                    GeneratedPropertyNameValidation.IsValid(GetPropertyName(field))
+                    && !IsFileLocalType(field.Type, ct)
+                )
+                    members.Add(CreateFieldInfo(field, ct));
             }
-            else if (member is IPropertySymbol property && IsIncompletePartialProperty(property, ct))
+            else if (
+                member is IPropertySymbol property
+                && IsIncompletePartialProperty(property, ct)
+                && !IsFileLocalType(property.Type, ct)
+            )
             {
                 members.Add(CreatePartialPropertyInfo(property));
             }
@@ -240,7 +257,10 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         );
         foreach (var field in classSymbol.GetMembers().OfType<IFieldSymbol>())
         {
-            if (FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible)
+            if (
+                FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible
+                && GeneratedPropertyNameValidation.IsValid(GetPropertyName(field))
+            )
                 targetPropertyNames.Add(GetPropertyName(field));
         }
 
@@ -251,6 +271,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             {
                 IFieldSymbol field
                     when FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible
+                        && GeneratedPropertyNameValidation.IsValid(GetPropertyName(field))
                     => GetPropertyName(field),
                 IPropertySymbol property => property.Name,
                 _ => null,
@@ -375,6 +396,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             requiresUnsafe,
             propertyAttributes: GetForwardedPropertyAttributes(field, cancellationToken),
             subPropertyNotify: GetSubPropertyNotifyTargets(field),
+            collectionNotify: GetCollectionNotifyTargets(field),
             hasNonPartialTypedChangedHook: typedHook is not null,
             existingTypedChangedHookParameterTypeName: GetExistingTypedHookParameterTypeName(
                 typedHook,
@@ -415,6 +437,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             needsNullableBackingField: IsNonNullableReferenceType(property.Type),
             getterAccess: GetAccessorAccessLevel(property.GetMethod, property.DeclaredAccessibility),
             subPropertyNotify: GetSubPropertyNotifyTargets(property),
+            collectionNotify: GetCollectionNotifyTargets(property),
             hasNonPartialTypedChangedHook: typedHook is not null,
             existingTypedChangedHookParameterTypeName: GetExistingTypedHookParameterTypeName(
                 typedHook,
@@ -916,6 +939,20 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             .ToImmutableArray();
     }
 
+    private static ImmutableArray<string> GetCollectionNotifyTargets(ISymbol member)
+    {
+        return GetNotifyAlsoAttributes(member)
+            .Where(attribute => !RequestsNotifyFrom(attribute))
+            .Where(attribute => attribute.NamedArguments.Any(named =>
+                named.Key == "NotifyOnCollectionChanged" && named.Value.Value is true
+            ))
+            .Select(attribute => attribute.ConstructorArguments.FirstOrDefault().Value as string)
+            .Where(static value => !string.IsNullOrEmpty(value))
+            .Cast<string>()
+            .Distinct(StringComparer.Ordinal)
+            .ToImmutableArray();
+    }
+
     private static ImmutableArray<string> GetSourceNotifyAlsoValues(ISymbol member)
     {
         return GetNotifyAlsoAttributes(member)
@@ -1157,14 +1194,60 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             sb.AppendLine();
         }
 
+        if (classInfo.IsSuppressable && classInfo.AlreadyImplementsInpc)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"{indent}    private void __notifyGenRaisePropertyChanged(string propertyName)");
+            sb.AppendLine($"{indent}    {{");
+            if (classInfo.AlwaysNotifyProperties.Length > 0)
+            {
+                sb.AppendLine(
+                    $"{indent}        if (_notificationSuppressionCount > 0 && !_neverSuppressedProperties.Contains(propertyName))"
+                );
+            }
+            else
+            {
+                sb.AppendLine($"{indent}        if (_notificationSuppressionCount > 0)");
+            }
+            sb.AppendLine($"{indent}        {{");
+            sb.AppendLine($"{indent}            _pendingNotifications ??= new HashSet<string>();");
+            sb.AppendLine($"{indent}            _pendingNotifications.Add(propertyName);");
+            sb.AppendLine($"{indent}            return;");
+            sb.AppendLine($"{indent}        }}");
+            AppendPropertyChangedVariableCall(
+                sb,
+                indent + "        ",
+                classInfo.PropertyChangedInvoker
+            );
+            sb.AppendLine($"{indent}    }}");
+        }
+
         // Generate child-property subscription state and handlers.
         foreach (var field in classInfo.Fields)
         {
-            if (!HasSubPropertySubscription(field))
-                continue;
+            if (HasSubPropertySubscription(field))
+            {
+                GenerateSubPropertyMembers(
+                    sb,
+                    field,
+                    indent,
+                    classInfo.PropertyChangedInvoker,
+                    classInfo.IsSuppressable && classInfo.AlreadyImplementsInpc
+                );
+                sb.AppendLine();
+            }
 
-            GenerateSubPropertyMembers(sb, field, indent);
-            sb.AppendLine();
+            if (HasCollectionSubscription(field))
+            {
+                GenerateCollectionMembers(
+                    sb,
+                    field,
+                    indent,
+                    classInfo.PropertyChangedInvoker,
+                    classInfo.IsSuppressable && classInfo.AlreadyImplementsInpc
+                );
+                sb.AppendLine();
+            }
         }
 
         // Generate properties
@@ -1175,7 +1258,10 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 field,
                 indent,
                 classInfo.ImplementChanging,
-                classInfo.MemberNames
+                classInfo.MemberNames,
+                classInfo.PropertyChangedInvoker,
+                classInfo.PropertyChangingInvoker,
+                classInfo.IsSuppressable && classInfo.AlreadyImplementsInpc
             );
             sb.AppendLine();
         }
@@ -1270,9 +1356,20 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 $"{indent}            foreach (var propertyName in _pendingNotifications)"
             );
             sb.AppendLine($"{indent}            {{");
-            sb.AppendLine(
-                $"{indent}                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));"
-            );
+            if (classInfo.AlreadyImplementsInpc)
+            {
+                AppendPropertyChangedVariableCall(
+                    sb,
+                    indent + "                ",
+                    classInfo.PropertyChangedInvoker
+                );
+            }
+            else
+            {
+                sb.AppendLine(
+                    $"{indent}                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));"
+                );
+            }
             sb.AppendLine($"{indent}            }}");
             sb.AppendLine($"{indent}            _pendingNotifications.Clear();");
             sb.AppendLine($"{indent}        }}");
@@ -1313,6 +1410,9 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     private static bool HasSubPropertySubscription(FieldInfo field) =>
         field.SubPropertyNotify.Length > 0 && !field.RequiresUnsafe;
 
+    private static bool HasCollectionSubscription(FieldInfo field) =>
+        field.CollectionNotify.Length > 0 && !field.RequiresUnsafe;
+
     private static string GetSubPropertyMemberPrefix(FieldInfo field)
     {
         var builder = new StringBuilder("__notifyGenSubProperty_");
@@ -1336,10 +1436,35 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         return builder.ToString();
     }
 
+    private static string GetCollectionMemberPrefix(FieldInfo field)
+    {
+        var builder = new StringBuilder("__notifyGenCollection_");
+        foreach (var character in field.PropertyName)
+        {
+            builder.Append(char.IsLetterOrDigit(character) || character == '_' ? character : '_');
+        }
+
+        unchecked
+        {
+            var hash = 2166136261u;
+            foreach (var character in field.PropertyName + "|" + field.FieldName)
+            {
+                hash ^= character;
+                hash *= 16777619;
+            }
+
+            builder.Append('_').Append(hash.ToString("X8"));
+        }
+
+        return builder.ToString();
+    }
+
     private static void GenerateSubPropertyMembers(
         StringBuilder sb,
         FieldInfo field,
-        string indent
+        string indent,
+        PropertyChangedInvokerKind invoker,
+        bool useSuppressionWrapper
     )
     {
         var prefix = GetSubPropertyMemberPrefix(field);
@@ -1355,8 +1480,12 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         sb.AppendLine($"{indent}    {{");
         foreach (var propertyName in field.SubPropertyNotify)
         {
-            sb.AppendLine(
-                $"{indent}        OnPropertyChanged({QuoteString(propertyName)});"
+            AppendPropertyChangedCall(
+                sb,
+                indent + "        ",
+                propertyName,
+                invoker,
+                useSuppressionWrapper: useSuppressionWrapper
             );
         }
         sb.AppendLine($"{indent}    }}");
@@ -1401,6 +1530,135 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         sb.AppendLine($"{indent}    }}");
     }
 
+    private static void GenerateCollectionMembers(
+        StringBuilder sb,
+        FieldInfo field,
+        string indent,
+        PropertyChangedInvokerKind invoker,
+        bool useSuppressionWrapper
+    )
+    {
+        var prefix = GetCollectionMemberPrefix(field);
+        sb.AppendLine(
+            $"{indent}    private global::System.Collections.Specialized.INotifyCollectionChanged? {prefix}Source;"
+        );
+        sb.AppendLine($"{indent}    private bool {prefix}Initialized;");
+        sb.AppendLine($"{indent}    private void {prefix}Changed(");
+        sb.AppendLine(
+            $"{indent}        object? sender, global::System.Collections.Specialized.NotifyCollectionChangedEventArgs e"
+        );
+        sb.AppendLine($"{indent}    )");
+        sb.AppendLine($"{indent}    {{");
+        foreach (var propertyName in field.CollectionNotify)
+        {
+            AppendPropertyChangedCall(
+                sb,
+                indent + "        ",
+                propertyName,
+                invoker,
+                useSuppressionWrapper: useSuppressionWrapper
+            );
+        }
+        sb.AppendLine($"{indent}    }}");
+        sb.AppendLine();
+        sb.AppendLine($"{indent}    private void {prefix}Ensure(object? currentValue)");
+        sb.AppendLine($"{indent}    {{");
+        sb.AppendLine($"{indent}        if ({prefix}Initialized)");
+        sb.AppendLine($"{indent}            return;");
+        sb.AppendLine();
+        sb.AppendLine($"{indent}        {prefix}Initialized = true;");
+        sb.AppendLine(
+            $"{indent}        if (currentValue is global::System.Collections.Specialized.INotifyCollectionChanged currentSource)"
+        );
+        sb.AppendLine($"{indent}        {{");
+        sb.AppendLine($"{indent}            {prefix}Source = currentSource;");
+        sb.AppendLine($"{indent}            currentSource.CollectionChanged += {prefix}Changed;");
+        sb.AppendLine($"{indent}        }}");
+        sb.AppendLine($"{indent}    }}");
+        sb.AppendLine();
+        sb.AppendLine($"{indent}    private void {prefix}Update(object? newValue)");
+        sb.AppendLine($"{indent}    {{");
+        sb.AppendLine($"{indent}        {prefix}Ensure(newValue);");
+        sb.AppendLine($"{indent}        if ({prefix}Source is not null)");
+        sb.AppendLine($"{indent}        {{");
+        sb.AppendLine($"{indent}            {prefix}Source.CollectionChanged -= {prefix}Changed;");
+        sb.AppendLine($"{indent}            {prefix}Source = null;");
+        sb.AppendLine($"{indent}        }}");
+        sb.AppendLine();
+        sb.AppendLine(
+            $"{indent}        if (newValue is global::System.Collections.Specialized.INotifyCollectionChanged newSource)"
+        );
+        sb.AppendLine($"{indent}        {{");
+        sb.AppendLine($"{indent}            {prefix}Source = newSource;");
+        sb.AppendLine($"{indent}            newSource.CollectionChanged += {prefix}Changed;");
+        sb.AppendLine($"{indent}        }}");
+        sb.AppendLine($"{indent}    }}");
+    }
+
+    private static void AppendPropertyChangedCall(
+        StringBuilder sb,
+        string indent,
+        string propertyName,
+        PropertyChangedInvokerKind invoker,
+        bool useSuppressionWrapper = false
+    )
+    {
+        var argument = QuoteString(propertyName);
+        if (useSuppressionWrapper)
+        {
+            sb.AppendLine($"{indent}__notifyGenRaisePropertyChanged({argument});");
+            return;
+        }
+        if (invoker == PropertyChangedInvokerKind.EventArgs)
+        {
+            sb.AppendLine(
+                $"{indent}OnPropertyChanged(new global::System.ComponentModel.PropertyChangedEventArgs({argument}));"
+            );
+        }
+        else
+        {
+            sb.AppendLine($"{indent}OnPropertyChanged({argument});");
+        }
+    }
+
+    private static void AppendPropertyChangedVariableCall(
+        StringBuilder sb,
+        string indent,
+        PropertyChangedInvokerKind invoker
+    )
+    {
+        if (invoker == PropertyChangedInvokerKind.EventArgs)
+        {
+            sb.AppendLine(
+                $"{indent}OnPropertyChanged(new global::System.ComponentModel.PropertyChangedEventArgs(propertyName));"
+            );
+        }
+        else
+        {
+            sb.AppendLine($"{indent}OnPropertyChanged(propertyName);");
+        }
+    }
+
+    private static void AppendPropertyChangingCall(
+        StringBuilder sb,
+        string indent,
+        string propertyName,
+        PropertyChangingInvokerKind invoker
+    )
+    {
+        var argument = QuoteString(propertyName);
+        if (invoker == PropertyChangingInvokerKind.EventArgs)
+        {
+            sb.AppendLine(
+                $"{indent}OnPropertyChanging(new global::System.ComponentModel.PropertyChangingEventArgs({argument}));"
+            );
+        }
+        else
+        {
+            sb.AppendLine($"{indent}OnPropertyChanging({argument});");
+        }
+    }
+
     private static string EnsureNonNull(string expression) =>
         expression.EndsWith("!", StringComparison.Ordinal) ? expression : $"{expression}!";
 
@@ -1426,7 +1684,10 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         FieldInfo field,
         string indent,
         bool implementChanging,
-        ImmutableArray<string> memberNames
+        ImmutableArray<string> memberNames,
+        PropertyChangedInvokerKind invoker,
+        PropertyChangingInvokerKind changingInvoker,
+        bool useSuppressionWrapper
     )
     {
         if (!field.PropertyAttributes.IsDefaultOrEmpty)
@@ -1452,16 +1713,23 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         var subPropertyPrefix = hasSubPropertySubscription
             ? GetSubPropertyMemberPrefix(field)
             : string.Empty;
+        var hasCollectionSubscription = HasCollectionSubscription(field);
+        var collectionPrefix = hasCollectionSubscription
+            ? GetCollectionMemberPrefix(field)
+            : string.Empty;
         sb.AppendLine(
             $"{indent}    {field.PropertyAccessibility}{partialModifier} {field.TypeName} {field.PropertyName}"
         );
         sb.AppendLine($"{indent}    {{");
         var getterModifier = field.GetterAccess != null ? $"{field.GetterAccess} " : "";
-        if (hasSubPropertySubscription)
+        if (hasSubPropertySubscription || hasCollectionSubscription)
         {
             sb.AppendLine($"{indent}        {getterModifier}get");
             sb.AppendLine($"{indent}        {{");
-            sb.AppendLine($"{indent}            {subPropertyPrefix}Ensure({backingValue});");
+            if (hasSubPropertySubscription)
+                sb.AppendLine($"{indent}            {subPropertyPrefix}Ensure({backingValue});");
+            if (hasCollectionSubscription)
+                sb.AppendLine($"{indent}            {collectionPrefix}Ensure({backingValue});");
             sb.AppendLine($"{indent}            return {backingValue};");
             sb.AppendLine($"{indent}        }}");
         }
@@ -1475,6 +1743,10 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         if (hasSubPropertySubscription)
         {
             sb.AppendLine($"{indent}            {subPropertyPrefix}Ensure({backingValue});");
+        }
+        if (hasCollectionSubscription)
+        {
+            sb.AppendLine($"{indent}            {collectionPrefix}Ensure({backingValue});");
         }
         // Pointer-like types use native-int equality to avoid function-pointer comparison warnings.
         if (field.IsPrimitiveType && field.RequiresUnsafe)
@@ -1519,7 +1791,15 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         // Fire PropertyChanging event if enabled
         if (implementChanging)
         {
-            sb.AppendLine($"{indent}            OnPropertyChanging();");
+            if (changingInvoker == PropertyChangingInvokerKind.Generated)
+                sb.AppendLine($"{indent}            OnPropertyChanging();");
+            else
+                AppendPropertyChangingCall(
+                    sb,
+                    indent + "            ",
+                    field.PropertyName,
+                    changingInvoker
+                );
         }
         sb.AppendLine(
             $"{indent}            On{field.PropertyName}Changing({changingOldValueArgument}, {changingNewValueArgument});"
@@ -1529,13 +1809,30 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         {
             sb.AppendLine($"{indent}            {subPropertyPrefix}Update(value);");
         }
-        sb.AppendLine($"{indent}            OnPropertyChanged();");
+        if (hasCollectionSubscription)
+        {
+            sb.AppendLine($"{indent}            {collectionPrefix}Update(value);");
+        }
+        if (invoker == PropertyChangedInvokerKind.Generated)
+            sb.AppendLine($"{indent}            OnPropertyChanged();");
+        else
+            AppendPropertyChangedCall(
+                sb,
+                indent + "            ",
+                field.PropertyName,
+                invoker,
+                useSuppressionWrapper: useSuppressionWrapper
+            );
 
         // NotifyAlso properties
         foreach (var alsoNotify in field.AlsoNotify)
         {
-            sb.AppendLine(
-                $"{indent}            OnPropertyChanged({QuoteString(alsoNotify)});"
+            AppendPropertyChangedCall(
+                sb,
+                indent + "            ",
+                alsoNotify,
+                invoker,
+                useSuppressionWrapper: useSuppressionWrapper
             );
         }
 

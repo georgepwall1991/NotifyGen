@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-08-09
+
+### Added
+
+- Reuse accessible existing `INotifyPropertyChanged` and `INotifyPropertyChanging` host invokers without duplicate interfaces, events, or helpers
+- Add direct `[NotifyAlso(NotifyOnCollectionChanged = true)]` membership tracking with lazy subscription, replacement/null detachment, and deduplicated targets
+- Add **NOTIFY013–NOTIFY017** safety diagnostics for incompatible hosts, unsupported collection declarations, and invalid generated names
+- Add Cycle 4 research/design evidence and adversarial compile, Emit, reflection, host, collection, partial-property, suppression, and replacement tests
+
 ## [1.9.0] - 2026-08-09
 
 ### Added

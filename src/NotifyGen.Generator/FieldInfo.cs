@@ -40,6 +40,11 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
     public ImmutableArray<string> SubPropertyNotify { get; }
 
     /// <summary>
+    /// Dependent properties to notify when a direct collection raises CollectionChanged.
+    /// </summary>
+    public ImmutableArray<string> CollectionNotify { get; }
+
+    /// <summary>
     /// Command names to call NotifyCanExecuteChanged() on when this field changes.
     /// </summary>
     public ImmutableArray<string> CommandsToNotify { get; }
@@ -118,6 +123,7 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         string? getterAccess = null,
         ImmutableArray<string> propertyAttributes = default,
         ImmutableArray<string> subPropertyNotify = default,
+        ImmutableArray<string> collectionNotify = default,
         bool hasNonPartialTypedChangedHook = false,
         string? existingTypedChangedHookParameterTypeName = null,
         string? existingTypedChangedHookNewParameterTypeName = null
@@ -146,6 +152,9 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         SubPropertyNotify = subPropertyNotify.IsDefault
             ? ImmutableArray<string>.Empty
             : subPropertyNotify;
+        CollectionNotify = collectionNotify.IsDefault
+            ? ImmutableArray<string>.Empty
+            : collectionNotify;
     }
 
     public FieldInfo WithAlsoNotify(ImmutableArray<string> alsoNotify) =>
@@ -165,6 +174,7 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             GetterAccess,
             PropertyAttributes,
             SubPropertyNotify,
+            CollectionNotify,
             HasNonPartialTypedChangedHook,
             ExistingTypedChangedHookParameterTypeName,
             ExistingTypedChangedHookNewParameterTypeName
@@ -188,6 +198,7 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             && ExistingTypedChangedHookNewParameterTypeName == other.ExistingTypedChangedHookNewParameterTypeName
             && PropertyAttributes.SequenceEqual(other.PropertyAttributes)
             && SubPropertyNotify.SequenceEqual(other.SubPropertyNotify)
+            && CollectionNotify.SequenceEqual(other.CollectionNotify)
             && AlsoNotify.SequenceEqual(other.AlsoNotify)
             && CommandsToNotify.SequenceEqual(other.CommandsToNotify);
     }
@@ -219,6 +230,8 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             foreach (var attribute in PropertyAttributes)
                 hash = hash * 31 + (attribute?.GetHashCode() ?? 0);
             foreach (var propertyName in SubPropertyNotify)
+                hash = hash * 31 + (propertyName?.GetHashCode() ?? 0);
+            foreach (var propertyName in CollectionNotify)
                 hash = hash * 31 + (propertyName?.GetHashCode() ?? 0);
             foreach (var propertyName in AlsoNotify)
                 hash = hash * 31 + (propertyName?.GetHashCode() ?? 0);
