@@ -7,10 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-08-09
+
 ### Added
 
-- Add explicit target-side `[NotifyAlso(NotifyFrom = true)]` dependency declarations
-- Add typed `On{Property}Changed(oldValue, newValue)` partial hooks
+- Add explicit target-side `[NotifyAlso(NotifyFrom = true)]` dependency declarations with transitive graph validation
+- Add typed `On{Property}Changed(oldValue, newValue)` partial hooks with equality suppression and field/partial-property support
 
 ## [1.8.0] - 2026-08-09
 

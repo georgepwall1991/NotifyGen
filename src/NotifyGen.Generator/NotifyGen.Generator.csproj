@@ -12,7 +12,7 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>NotifyGen</PackageId>
-    <Version>1.8.0</Version>
+    <Version>1.9.0</Version>
     <Authors>George Wall</Authors>
     <Title>NotifyGen - INotifyPropertyChanged Source Generator</Title>
     <Description>A fast INotifyPropertyChanged source generator for .NET. Eliminates MVVM boilerplate with a single [Notify] attribute, no runtime dependency, full IntelliSense, and debuggable generated code.
@@ -37,7 +37,11 @@ Features:
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>v1.8.0:
+    <PackageReleaseNotes>v1.9.0:
+• Add explicit target-side [NotifyAlso(NotifyFrom = true)] dependency declarations with transitive graph validation
+• Add typed On{Property}Changed(oldValue, newValue) post-change hooks with equality suppression and field/partial-property support
+
+v1.8.0:
 • Forward property-targetable field attributes with bound constructor and named values
 • Opt into direct child INotifyPropertyChanged notifications with NotifyOnSubPropertyChanged and NOTIFY010 guidance
 
