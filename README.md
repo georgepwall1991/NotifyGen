@@ -502,7 +502,18 @@ partial void OnSelectedItemChanged()
 }
 ```
 
-If you don't implement these methods, the compiler removes the calls entirely—no performance cost.
+An optional typed overload receives both values:
+
+```csharp
+partial void OnNameChanged(string oldValue, string newValue)
+{
+    AuditChange(oldValue, newValue);
+}
+```
+
+The typed overload runs after assignment and the parameterless overload. If you
+don't implement these methods, the compiler removes the calls entirely—no
+performance cost.
 
 ### Integration with Validation Frameworks
 

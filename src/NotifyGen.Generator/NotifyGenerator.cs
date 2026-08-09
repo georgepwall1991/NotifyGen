@@ -176,7 +176,8 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             implementChanging,
             isSuppressable,
             alwaysNotifyProperties,
-            ExtractFields(classSymbol, ct)
+            ExtractFields(classSymbol, ct),
+            classSymbol.GetMembers().Select(static member => member.Name).ToImmutableArray()
         );
     }
 
@@ -356,6 +357,11 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         var setterAccess = GetSetterAccessLevel(field);
         var isPrimitiveType = IsPrimitiveValueType(field.Type);
         var requiresUnsafe = RequiresUnsafeContext(field.Type);
+        var typedHook = FindNonPartialTypedChangedHook(
+            field.ContainingType,
+            propertyName,
+            field.Type
+        );
 
         return new FieldInfo(
             field.Name,
@@ -368,7 +374,18 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             isPrimitiveType,
             requiresUnsafe,
             propertyAttributes: GetForwardedPropertyAttributes(field, cancellationToken),
-            subPropertyNotify: GetSubPropertyNotifyTargets(field)
+            subPropertyNotify: GetSubPropertyNotifyTargets(field),
+            hasNonPartialTypedChangedHook: typedHook is not null,
+            existingTypedChangedHookParameterTypeName: GetExistingTypedHookParameterTypeName(
+                typedHook,
+                field.Type,
+                0
+            ),
+            existingTypedChangedHookNewParameterTypeName: GetExistingTypedHookParameterTypeName(
+                typedHook,
+                field.Type,
+                1
+            )
         );
     }
 
@@ -378,6 +395,11 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     private static FieldInfo CreatePartialPropertyInfo(IPropertySymbol property)
     {
         var typeName = property.Type.ToDisplayString(TypeDisplayFormat);
+        var typedHook = FindNonPartialTypedChangedHook(
+            property.ContainingType,
+            property.Name,
+            property.Type
+        );
         return new FieldInfo(
             "field",
             property.Name,
@@ -392,9 +414,159 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             propertyAccessibility: GetAccessibilityText(property.DeclaredAccessibility),
             needsNullableBackingField: IsNonNullableReferenceType(property.Type),
             getterAccess: GetAccessorAccessLevel(property.GetMethod, property.DeclaredAccessibility),
-            subPropertyNotify: GetSubPropertyNotifyTargets(property)
+            subPropertyNotify: GetSubPropertyNotifyTargets(property),
+            hasNonPartialTypedChangedHook: typedHook is not null,
+            existingTypedChangedHookParameterTypeName: GetExistingTypedHookParameterTypeName(
+                typedHook,
+                property.Type,
+                0
+            ),
+            existingTypedChangedHookNewParameterTypeName: GetExistingTypedHookParameterTypeName(
+                typedHook,
+                property.Type,
+                1
+            )
         );
     }
+
+    private static IMethodSymbol? FindNonPartialTypedChangedHook(
+        INamedTypeSymbol containingType,
+        string propertyName,
+        ITypeSymbol propertyType
+    )
+    {
+        var hookName = $"On{propertyName}Changed";
+        for (var type = containingType; type is not null; type = type.BaseType)
+        {
+            foreach (var method in type.GetMembers(hookName).OfType<IMethodSymbol>())
+            {
+                if (
+                    method.Parameters.Length == 2
+                    && method.Parameters[0].RefKind == RefKind.None
+                    && method.Parameters[1].RefKind == RefKind.None
+                    && AreHookTypesEquivalent(method.Parameters[0].Type, propertyType)
+                    && AreHookTypesEquivalent(method.Parameters[1].Type, propertyType)
+                    && !IsPartialMethod(method)
+                    && (
+                        SymbolEqualityComparer.Default.Equals(method.ContainingType, containingType)
+                        || IsInheritedHookAccessible(method, containingType)
+                    )
+                )
+                {
+                    return method;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static string? GetExistingTypedHookParameterTypeName(
+        IMethodSymbol? method,
+        ITypeSymbol propertyType,
+        int parameterIndex
+    )
+    {
+        if (
+            method is null
+            || SymbolEqualityComparer.IncludeNullability.Equals(
+                method.Parameters[parameterIndex].Type,
+                propertyType
+            )
+        )
+        {
+            return null;
+        }
+
+        var parameterType = method.Parameters[parameterIndex].Type;
+        if (parameterType.TypeKind == TypeKind.Dynamic)
+        {
+            return parameterType.NullableAnnotation == NullableAnnotation.Annotated
+                ? "global::System.Object?"
+                : "global::System.Object";
+        }
+
+        return parameterType.ToDisplayString(TypeDisplayFormat);
+    }
+
+    private static bool IsInheritedHookAccessible(
+        IMethodSymbol method,
+        INamedTypeSymbol containingType
+    )
+    {
+        return method.DeclaredAccessibility switch
+        {
+            Accessibility.Public
+                or Accessibility.Protected
+                or Accessibility.ProtectedOrInternal => true,
+            Accessibility.Internal
+                or Accessibility.ProtectedAndInternal => SymbolEqualityComparer.Default.Equals(
+                method.ContainingAssembly,
+                containingType.ContainingAssembly
+            ),
+            _ => false,
+        };
+    }
+
+    private static bool AreHookTypesEquivalent(ITypeSymbol left, ITypeSymbol right)
+    {
+        if (SymbolEqualityComparer.Default.Equals(left, right))
+            return true;
+
+        if (
+            SymbolEqualityComparer.Default.Equals(
+                left.WithNullableAnnotation(NullableAnnotation.None),
+                right.WithNullableAnnotation(NullableAnnotation.None)
+            )
+        )
+        {
+            return true;
+        }
+
+        // `dynamic` and `object` have the same metadata signature, even though
+        // Roslyn preserves a dynamic annotation on one of the symbols.
+        if (
+            (left.TypeKind == TypeKind.Dynamic || left.SpecialType == SpecialType.System_Object)
+            && (right.TypeKind == TypeKind.Dynamic || right.SpecialType == SpecialType.System_Object)
+        )
+        {
+            return true;
+        }
+
+        if (left is IArrayTypeSymbol leftArray && right is IArrayTypeSymbol rightArray)
+        {
+            return leftArray.Rank == rightArray.Rank
+                && AreHookTypesEquivalent(leftArray.ElementType, rightArray.ElementType);
+        }
+
+        if (left is INamedTypeSymbol leftNamed && right is INamedTypeSymbol rightNamed)
+        {
+            return SymbolEqualityComparer.Default.Equals(
+                    leftNamed.OriginalDefinition,
+                    rightNamed.OriginalDefinition
+                )
+                && leftNamed.TypeArguments.Length == rightNamed.TypeArguments.Length
+                && Enumerable
+                    .Range(0, leftNamed.TypeArguments.Length)
+                    .All(index =>
+                        AreHookTypesEquivalent(
+                            leftNamed.TypeArguments[index],
+                            rightNamed.TypeArguments[index]
+                        )
+                    );
+        }
+
+        return false;
+    }
+
+    private static bool IsPartialMethod(IMethodSymbol method) =>
+        method.IsPartialDefinition
+        || method.PartialDefinitionPart is not null
+        || method.PartialImplementationPart is not null
+        || method.DeclaringSyntaxReferences.Any(reference =>
+            reference.GetSyntax() is MethodDeclarationSyntax declaration
+            && declaration.Modifiers.Any(SyntaxKind.PartialKeyword)
+        );
 
     private static bool IsIncompletePartialProperty(
         IPropertySymbol property,
@@ -998,7 +1170,13 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         // Generate properties
         foreach (var field in classInfo.Fields)
         {
-            GenerateProperty(sb, field, indent, classInfo.ImplementChanging);
+            GenerateProperty(
+                sb,
+                field,
+                indent,
+                classInfo.ImplementChanging,
+                classInfo.MemberNames
+            );
             sb.AppendLine();
         }
 
@@ -1058,6 +1236,12 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 $"{indent}    partial void On{field.PropertyName}Changing({field.TypeName} oldValue, {field.TypeName} newValue);"
             );
             sb.AppendLine($"{indent}    partial void On{field.PropertyName}Changed();");
+            if (!field.HasNonPartialTypedChangedHook)
+            {
+                sb.AppendLine(
+                    $"{indent}    partial void On{field.PropertyName}Changed({field.TypeName} oldValue, {field.TypeName} newValue);"
+                );
+            }
         }
 
         // Suppression methods (only if IsSuppressable)
@@ -1217,6 +1401,23 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         sb.AppendLine($"{indent}    }}");
     }
 
+    private static string EnsureNonNull(string expression) =>
+        expression.EndsWith("!", StringComparison.Ordinal) ? expression : $"{expression}!";
+
+    private static string GetOldValueLocalName(ImmutableArray<string> memberNames)
+    {
+        const string baseName = "__notifyGenOldValue";
+        var candidate = baseName;
+        var suffix = 0;
+        while (memberNames.Contains(candidate, StringComparer.Ordinal))
+        {
+            suffix++;
+            candidate = $"{baseName}{suffix}";
+        }
+
+        return candidate;
+    }
+
     /// <summary>
     /// Generates a single property.
     /// </summary>
@@ -1224,7 +1425,8 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         StringBuilder sb,
         FieldInfo field,
         string indent,
-        bool implementChanging
+        bool implementChanging,
+        ImmutableArray<string> memberNames
     )
     {
         if (!field.PropertyAttributes.IsDefaultOrEmpty)
@@ -1291,13 +1493,36 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 $"{indent}            if (EqualityComparer<{field.TypeName}>.Default.Equals({backingValue}, value)) return;"
             );
         }
+        var oldValueLocalName = GetOldValueLocalName(memberNames);
+        var isDynamicType = field.TypeName == "dynamic" || field.TypeName == "dynamic?";
+        var oldValueArgument = isDynamicType
+            ? $"((global::System.Object?){oldValueLocalName})!"
+            : oldValueLocalName;
+        var newValueArgument = isDynamicType
+            ? "((global::System.Object?)value)!"
+            : "value";
+        var changingOldValueArgument = isDynamicType ? oldValueArgument : backingValue;
+        var changingNewValueArgument = isDynamicType ? newValueArgument : "value";
+        var existingOldHookType = field.ExistingTypedChangedHookParameterTypeName;
+        var existingNewHookType = field.ExistingTypedChangedHookNewParameterTypeName;
+        var typedOldValueArgument = existingOldHookType is not null
+            ? $"({existingOldHookType})({EnsureNonNull(oldValueArgument)})"
+            : field.IsNullable && !isDynamicType
+                ? $"{oldValueArgument}!"
+                : oldValueArgument;
+        var typedNewValueArgument = existingNewHookType is not null
+            ? $"({existingNewHookType})({EnsureNonNull(newValueArgument)})"
+            : field.IsNullable && !isDynamicType
+                ? $"{newValueArgument}!"
+                : newValueArgument;
+        sb.AppendLine($"{indent}            var {oldValueLocalName} = {backingValue};");
         // Fire PropertyChanging event if enabled
         if (implementChanging)
         {
             sb.AppendLine($"{indent}            OnPropertyChanging();");
         }
         sb.AppendLine(
-            $"{indent}            On{field.PropertyName}Changing({backingValue}, value);"
+            $"{indent}            On{field.PropertyName}Changing({changingOldValueArgument}, {changingNewValueArgument});"
         );
         sb.AppendLine($"{indent}            {field.FieldName} = value;");
         if (hasSubPropertySubscription)
@@ -1321,6 +1546,9 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         }
 
         sb.AppendLine($"{indent}            On{field.PropertyName}Changed();");
+        sb.AppendLine(
+            $"{indent}            On{field.PropertyName}Changed({typedOldValueArgument}, {typedNewValueArgument});"
+        );
         sb.AppendLine($"{indent}        }}");
         sb.AppendLine($"{indent}    }}");
     }

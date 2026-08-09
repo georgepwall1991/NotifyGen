@@ -13,6 +13,7 @@ internal readonly struct NotificationTypeInfo : IEquatable<NotificationTypeInfo>
     public bool ImplementChanging { get; }
     public bool IsSuppressable { get; }
     public ImmutableArray<string> AlwaysNotifyProperties { get; }
+    public ImmutableArray<string> MemberNames { get; }
     public ImmutableArray<FieldInfo> Fields { get; }
     public TypeDeclarationInfo TargetType => TypeDeclarations[TypeDeclarations.Length - 1];
     public bool CanGenerate =>
@@ -28,7 +29,8 @@ internal readonly struct NotificationTypeInfo : IEquatable<NotificationTypeInfo>
         bool implementChanging,
         bool isSuppressable,
         ImmutableArray<string> alwaysNotifyProperties,
-        ImmutableArray<FieldInfo> fields
+        ImmutableArray<FieldInfo> fields,
+        ImmutableArray<string> memberNames = default
     )
     {
         Namespace = @namespace;
@@ -38,6 +40,9 @@ internal readonly struct NotificationTypeInfo : IEquatable<NotificationTypeInfo>
         ImplementChanging = implementChanging;
         IsSuppressable = isSuppressable;
         AlwaysNotifyProperties = alwaysNotifyProperties;
+        MemberNames = memberNames.IsDefault
+            ? ImmutableArray<string>.Empty
+            : memberNames;
         Fields = fields;
     }
 
@@ -49,6 +54,7 @@ internal readonly struct NotificationTypeInfo : IEquatable<NotificationTypeInfo>
         && ImplementChanging == other.ImplementChanging
         && IsSuppressable == other.IsSuppressable
         && AlwaysNotifyProperties.SequenceEqual(other.AlwaysNotifyProperties)
+        && MemberNames.SequenceEqual(other.MemberNames)
         && Fields.SequenceEqual(other.Fields);
 
     public override bool Equals(object? obj) => obj is NotificationTypeInfo other && Equals(other);
@@ -67,6 +73,8 @@ internal readonly struct NotificationTypeInfo : IEquatable<NotificationTypeInfo>
             hash = hash * 31 + IsSuppressable.GetHashCode();
             foreach (var propertyName in AlwaysNotifyProperties)
                 hash = hash * 31 + propertyName.GetHashCode();
+            foreach (var memberName in MemberNames)
+                hash = hash * 31 + memberName.GetHashCode();
             foreach (var field in Fields)
                 hash = hash * 31 + field.GetHashCode();
             return hash;

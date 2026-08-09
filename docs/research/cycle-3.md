@@ -14,7 +14,7 @@ Typed callback demand is [#575](https://github.com/CommunityToolkit/dotnet/issue
 
 ## Fody.PropertyChanged
 
-Source is pinned to `14a0870a7afcd44f334b4e122f3fb189106d16fa`. Fody's dependent-property implementation and tests establish the explicit dependency space. [Issue #341](https://github.com/Fody/PropertyChanged/issues/341) requests old values for `On_Property_Changed` and has **0 reactions**; [#179](https://github.com/Fody/PropertyChanged/issues/179) has **18 reactions** but was selected for cycle 1 and is not counted again. Fody's `BeforeAfter`/typed hook source and fixtures provide implementation evidence, not a new demand count.
+Source is pinned to `14a0870a7afcd44f334b4e122f3fb189106d16fa`. Fody's dependent-property implementation and tests establish the explicit dependency space. [Issue #341](https://github.com/Fody/PropertyChanged/issues/341) requests old values for `On_Property_Changed` and has **1 `+1` reaction** at this snapshot; [#179](https://github.com/Fody/PropertyChanged/issues/179) has **18 reactions** but was selected for cycle 1 and is not counted again. Fody's `BeforeAfter`/typed hook source and fixtures provide implementation evidence, not a new demand count.
 
 Fody comparer issues [#162](https://github.com/Fody/PropertyChanged/issues/162) (**0 reactions, 21 comments**) and [#347](https://github.com/Fody/PropertyChanged/issues/347) (**0 reactions, 7 comments**) remain evidence-insufficient for comparer customization. Setter/suppression and dependent-hook bug reports were treated as adjacent quality evidence, not feature demand.
 
@@ -40,4 +40,4 @@ For explicit dependent-property graphs, the strict records are **4 GitHub + 4 St
 
 **Deepening: typed post-change hooks.** Extend the existing generated `On{Property}Changed()` partial hook with an optional typed overload `On{Property}Changed(T oldValue, T newValue)`. This is backed by the 6-record strict typed-hook cluster (4 GitHub + 2 Stack Overflow), PSG source/tests, Fody hook fixtures, and the broad SO #47723876 signal. The existing parameterless hook remains valid, and the change does not alter `PropertyChangedEventArgs` or introduce a runtime dependency.
 
-Dropped/deferred: accessor-target metadata (5 strict demand records but cycle 2 already shipped generic property metadata; the remaining syntax reconstruction is higher risk), automatic getter inference, collection bubbling, comparers, suppression redesign, validation, diagnostics expansion, custom getters, commands, messaging, DI, and navigation.
+Dropped/deferred: accessor-target metadata (5 strict demand records but cycle 2 already shipped generic property metadata; the remaining syntax reconstruction is higher risk), automatic getter inference, collection bubbling, comparers, suppression redesign, validation, diagnostics beyond the selected target-side validation, custom getters, commands, messaging, DI, and navigation.
