@@ -30,7 +30,9 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.FileLocalTypeNotSupported,
             DiagnosticDescriptors.NotifyAlsoDependencyCycle,
             DiagnosticDescriptors.GeneratedPropertyNameCollision,
-            DiagnosticDescriptors.NotifyAlsoSubPropertyRequiresInpc
+            DiagnosticDescriptors.NotifyAlsoSubPropertyRequiresInpc,
+            DiagnosticDescriptors.NotifyAlsoTargetRequiresGeneratedSource,
+            DiagnosticDescriptors.NotifyAlsoTargetSubPropertyUnsupported
         );
 
     public override void Initialize(AnalysisContext context)
@@ -293,56 +295,108 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             "System.ComponentModel.INotifyPropertyChanged"
         );
         var edges = ImmutableArray.CreateBuilder<DependencyEdge>();
+        var analyzedMembers = generatedMembers.ToList();
+        foreach (var property in classSymbol.GetMembers().OfType<IPropertySymbol>())
+        {
+            if (
+                !generatedMembers.ContainsKey(property.Name)
+                && GetNotifyAlsoAttributes(property).Any(RequestsNotifyFrom)
+            )
+            {
+                analyzedMembers.Add(new KeyValuePair<string, ISymbol>(property.Name, property));
+            }
+        }
 
-        foreach (var generatedMember in generatedMembers)
+        foreach (var generatedMember in analyzedMembers)
         {
             foreach (var attribute in GetNotifyAlsoAttributes(generatedMember.Value))
             {
-                var propertyName = attribute.ConstructorArguments.FirstOrDefault().Value as string;
-                if (string.IsNullOrEmpty(propertyName))
+                var referencedName = attribute.ConstructorArguments.FirstOrDefault().Value as string;
+                if (string.IsNullOrEmpty(referencedName))
                     continue;
 
+                var notifyFrom = RequestsNotifyFrom(attribute);
+                var sourceName = notifyFrom ? referencedName! : generatedMember.Key;
+                var targetName = notifyFrom ? generatedMember.Key : referencedName!;
+                var location = GetAttributeLocation(
+                    generatedMember.Value,
+                    attribute,
+                    context.CancellationToken
+                );
+
+                if (notifyFrom && RequestsSubPropertyNotification(attribute))
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.NotifyAlsoTargetSubPropertyUnsupported,
+                            location,
+                            targetName
+                        )
+                    );
+                }
+
                 if (
-                    RequestsSubPropertyNotification(attribute)
+                    !notifyFrom
+                    && RequestsSubPropertyNotification(attribute)
                     && !MemberImplementsInpc(generatedMember.Value, inpcType)
                 )
                 {
                     context.ReportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.NotifyAlsoSubPropertyRequiresInpc,
-                            GetAttributeLocation(
-                                generatedMember.Value,
-                                attribute,
-                                context.CancellationToken
-                            ),
+                            location,
                             generatedMember.Value.Name
                         )
                     );
                 }
 
-                if (!allKnownProperties.Contains(propertyName!))
+                if (notifyFrom && !generatedMembers.ContainsKey(sourceName))
                 {
-                    var location = GetAttributeLocation(
-                        generatedMember.Value,
-                        attribute,
-                        context.CancellationToken
-                    );
+                    if (!allKnownProperties.Contains(sourceName))
+                    {
+                        context.ReportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.UnknownNotifyAlsoProperty,
+                                location,
+                                generatedMember.Value.Name,
+                                sourceName
+                            )
+                        );
+                    }
+                    else
+                    {
+                        context.ReportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.NotifyAlsoTargetRequiresGeneratedSource,
+                                location,
+                                targetName,
+                                sourceName
+                            )
+                        );
+                    }
+                    continue;
+                }
+
+                var endpointName = notifyFrom ? sourceName : targetName;
+                if (!allKnownProperties.Contains(endpointName))
+                {
                     context.ReportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.UnknownNotifyAlsoProperty,
                             location,
                             generatedMember.Value.Name,
-                            propertyName
+                            endpointName
                         )
                     );
+                    continue;
                 }
 
-                if (generatedMembers.ContainsKey(propertyName!))
+                if (generatedMembers.ContainsKey(sourceName))
                 {
                     edges.Add(
                         new DependencyEdge(
-                            GetGeneratedPropertyName(generatedMember.Value),
-                            propertyName!,
+                            sourceName,
+                            targetName,
                             generatedMember.Value,
                             attribute
                         )
@@ -358,6 +412,11 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         attribute.NamedArguments.Any(named =>
             named.Key == "NotifyOnSubPropertyChanged"
             && named.Value.Value is true
+        );
+
+    private static bool RequestsNotifyFrom(AttributeData attribute) =>
+        attribute.NamedArguments.Any(named =>
+            named.Key == "NotifyFrom" && named.Value.Value is true
         );
 
     private static bool MemberImplementsInpc(ISymbol member, INamedTypeSymbol? inpcType)

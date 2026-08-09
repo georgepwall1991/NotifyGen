@@ -225,14 +225,70 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             return ImmutableArray<FieldInfo>.Empty;
         }
 
-        var byPropertyName = directMembers.ToDictionary(static member => member.PropertyName);
+        var directTargets = directMembers.ToDictionary(
+            static member => member.PropertyName,
+            static member => member.AlsoNotify.ToBuilder(),
+            StringComparer.Ordinal
+        );
+        var targetPropertyNames = new HashSet<string>(
+            classSymbol
+                .GetMembers()
+                .OfType<IPropertySymbol>()
+                .Select(static property => property.Name),
+            StringComparer.Ordinal
+        );
+        foreach (var field in classSymbol.GetMembers().OfType<IFieldSymbol>())
+        {
+            if (FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible)
+                targetPropertyNames.Add(GetPropertyName(field));
+        }
+
+        foreach (var member in classSymbol.GetMembers())
+        {
+            ct.ThrowIfCancellationRequested();
+            var targetName = member switch
+            {
+                IFieldSymbol field
+                    when FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible
+                    => GetPropertyName(field),
+                IPropertySymbol property => property.Name,
+                _ => null,
+            };
+            if (targetName == null || !targetPropertyNames.Contains(targetName))
+                continue;
+
+            foreach (var attribute in GetNotifyAlsoAttributes(member))
+            {
+                if (!RequestsNotifyFrom(attribute))
+                    continue;
+
+                var sourceName = attribute.ConstructorArguments.FirstOrDefault().Value as string;
+                if (
+                    !string.IsNullOrEmpty(sourceName)
+                    && directTargets.TryGetValue(sourceName!, out var targets)
+                )
+                {
+                    targets.Add(targetName);
+                }
+            }
+        }
+
+        var mergedMembers = directMembers.ToDictionary(
+            static member => member.PropertyName,
+            member => member.WithAlsoNotify(directTargets[member.PropertyName].ToImmutable()),
+            StringComparer.Ordinal
+        );
         var result = ImmutableArray.CreateBuilder<FieldInfo>(directMembers.Length);
         foreach (var member in directMembers)
         {
             ct.ThrowIfCancellationRequested();
             result.Add(
                 member.WithAlsoNotify(
-                    ExpandAlsoNotify(member.PropertyName, member.AlsoNotify, byPropertyName)
+                    ExpandAlsoNotify(
+                        member.PropertyName,
+                        mergedMembers[member.PropertyName].AlsoNotify,
+                        mergedMembers
+                    )
                 )
             );
         }
@@ -295,7 +351,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         var propertyName = GetPropertyName(field);
         var typeName = field.Type.ToDisplayString(TypeDisplayFormat);
         var isNullable = IsNullableType(field.Type);
-        var alsoNotify = GetAttributeValues(field, NotifyAlsoAttributeName);
+        var alsoNotify = GetSourceNotifyAlsoValues(field);
         var commandsToNotify = GetAttributeValues(field, NotifyCanExecuteChangedForAttributeName);
         var setterAccess = GetSetterAccessLevel(field);
         var isPrimitiveType = IsPrimitiveValueType(field.Type);
@@ -327,7 +383,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             property.Name,
             typeName,
             IsNullableType(property.Type),
-            GetAttributeValues(property, NotifyAlsoAttributeName),
+            GetSourceNotifyAlsoValues(property),
             GetAttributeValues(property, NotifyCanExecuteChangedForAttributeName),
             GetAccessorAccessLevel(property.SetMethod, property.DeclaredAccessibility),
             isPrimitiveType: IsPrimitiveValueType(property.Type),
@@ -674,6 +730,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             .Where(attribute =>
                 attribute.AttributeClass?.ToDisplayString() == NotifyAlsoAttributeName
             )
+            .Where(attribute => !RequestsNotifyFrom(attribute))
             .Where(attribute =>
                 attribute.NamedArguments.Any(named =>
                     named.Key == "NotifyOnSubPropertyChanged"
@@ -686,6 +743,28 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             .Distinct(StringComparer.Ordinal)
             .ToImmutableArray();
     }
+
+    private static ImmutableArray<string> GetSourceNotifyAlsoValues(ISymbol member)
+    {
+        return GetNotifyAlsoAttributes(member)
+            .Where(attribute => !RequestsNotifyFrom(attribute))
+            .Select(attribute => attribute.ConstructorArguments.FirstOrDefault().Value as string)
+            .Where(static value => !string.IsNullOrEmpty(value))
+            .Cast<string>()
+            .ToImmutableArray();
+    }
+
+    private static IEnumerable<AttributeData> GetNotifyAlsoAttributes(ISymbol member) =>
+        member
+            .GetAttributes()
+            .Where(attribute =>
+                attribute.AttributeClass?.ToDisplayString() == NotifyAlsoAttributeName
+            );
+
+    private static bool RequestsNotifyFrom(AttributeData attribute) =>
+        attribute.NamedArguments.Any(named =>
+            named.Key == "NotifyFrom" && named.Value.Value is true
+        );
 
     /// <summary>
     /// Extracts string values from multiple instances of an attribute.
