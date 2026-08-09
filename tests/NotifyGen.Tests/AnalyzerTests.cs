@@ -167,6 +167,112 @@ public class AnalyzerTests
     }
 
     [Fact]
+    public async Task Analyzer_NotifyAlsoTargetSideWithUnknownSource_ReportsWarning()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyAlso(nameof(Missing), NotifyFrom = true)]
+                private string _displayName = string.Empty;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == "NOTIFY003");
+    }
+
+    [Fact]
+    public async Task Analyzer_NotifyAlsoTargetSideWithManualSource_ReportsWarning()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyAlso(nameof(Manual), NotifyFrom = true)]
+                private string _displayName = string.Empty;
+
+                public string Manual => DisplayName;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == "NOTIFY011");
+    }
+
+    [Fact]
+    public async Task Analyzer_NotifyAlsoTargetSideOnOrdinaryProperty_ReportsWarning()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                private string _name = string.Empty;
+
+                [NotifyAlso(nameof(Manual), NotifyFrom = true)]
+                public string DisplayName => Manual;
+
+                public string Manual => Name;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == "NOTIFY011");
+    }
+
+    [Fact]
+    public async Task Analyzer_NotifyAlsoTargetSideCycle_ReportsCycleError()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [NotifyAlso(nameof(B), NotifyFrom = true)]
+                private string _a = string.Empty;
+
+                [NotifyAlso(nameof(A), NotifyFrom = true)]
+                private string _b = string.Empty;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == "NOTIFY008");
+    }
+
+    [Fact]
+    public async Task Analyzer_NotifyAlsoTargetSideWithChildTracking_ReportsWarning()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                private string _name = string.Empty;
+
+                [NotifyAlso(nameof(Name), NotifyFrom = true, NotifyOnSubPropertyChanged = true)]
+                private string _displayName = string.Empty;
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        diagnostics.Should().ContainSingle(diagnostic => diagnostic.Id == "NOTIFY012");
+    }
+
+    [Fact]
     public async Task Analyzer_NotifyAlsoWithUnknownProperty_ReportsWarning()
     {
         // Arrange
@@ -1268,6 +1374,13 @@ public class AnalyzerTests
         descriptor.Category.Should().Be("NotifyGen");
         descriptor.DefaultSeverity.Should().Be(DiagnosticSeverity.Warning);
         descriptor.IsEnabledByDefault.Should().BeTrue();
+    }
+
+    [Fact]
+    public void DiagnosticDescriptors_NotifyAlsoTargetSide_HaveCorrectProperties()
+    {
+        DiagnosticDescriptors.NotifyAlsoTargetRequiresGeneratedSource.Id.Should().Be("NOTIFY011");
+        DiagnosticDescriptors.NotifyAlsoTargetSubPropertyUnsupported.Id.Should().Be("NOTIFY012");
     }
 
     [Fact]

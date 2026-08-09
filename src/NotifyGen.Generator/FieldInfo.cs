@@ -82,6 +82,22 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
     public string? GetterAccess { get; }
 
     /// <summary>
+    /// Whether a non-partial user method already implements the typed Changed hook.
+    /// </summary>
+    public bool HasNonPartialTypedChangedHook { get; }
+
+    /// <summary>
+    /// The existing ordinary hook parameter type when it differs only by metadata
+    /// annotations from the generated property type.
+    /// </summary>
+    public string? ExistingTypedChangedHookParameterTypeName { get; }
+
+    /// <summary>
+    /// The second existing ordinary hook parameter type when it differs from the generated type.
+    /// </summary>
+    public string? ExistingTypedChangedHookNewParameterTypeName { get; }
+
+    /// <summary>
     /// Source attributes that are valid on the generated property.
     /// </summary>
     public ImmutableArray<string> PropertyAttributes { get; }
@@ -101,7 +117,10 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         bool needsNullableBackingField = false,
         string? getterAccess = null,
         ImmutableArray<string> propertyAttributes = default,
-        ImmutableArray<string> subPropertyNotify = default
+        ImmutableArray<string> subPropertyNotify = default,
+        bool hasNonPartialTypedChangedHook = false,
+        string? existingTypedChangedHookParameterTypeName = null,
+        string? existingTypedChangedHookNewParameterTypeName = null
     )
     {
         FieldName = fieldName;
@@ -118,6 +137,9 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         PropertyAccessibility = propertyAccessibility;
         NeedsNullableBackingField = needsNullableBackingField;
         GetterAccess = getterAccess;
+        HasNonPartialTypedChangedHook = hasNonPartialTypedChangedHook;
+        ExistingTypedChangedHookParameterTypeName = existingTypedChangedHookParameterTypeName;
+        ExistingTypedChangedHookNewParameterTypeName = existingTypedChangedHookNewParameterTypeName;
         PropertyAttributes = propertyAttributes.IsDefault
             ? ImmutableArray<string>.Empty
             : propertyAttributes;
@@ -142,7 +164,10 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             NeedsNullableBackingField,
             GetterAccess,
             PropertyAttributes,
-            SubPropertyNotify
+            SubPropertyNotify,
+            HasNonPartialTypedChangedHook,
+            ExistingTypedChangedHookParameterTypeName,
+            ExistingTypedChangedHookNewParameterTypeName
         );
 
     public bool Equals(FieldInfo other)
@@ -158,6 +183,9 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             && PropertyAccessibility == other.PropertyAccessibility
             && NeedsNullableBackingField == other.NeedsNullableBackingField
             && GetterAccess == other.GetterAccess
+            && HasNonPartialTypedChangedHook == other.HasNonPartialTypedChangedHook
+            && ExistingTypedChangedHookParameterTypeName == other.ExistingTypedChangedHookParameterTypeName
+            && ExistingTypedChangedHookNewParameterTypeName == other.ExistingTypedChangedHookNewParameterTypeName
             && PropertyAttributes.SequenceEqual(other.PropertyAttributes)
             && SubPropertyNotify.SequenceEqual(other.SubPropertyNotify)
             && AlsoNotify.SequenceEqual(other.AlsoNotify)
@@ -185,6 +213,9 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             hash = hash * 31 + (PropertyAccessibility?.GetHashCode() ?? 0);
             hash = hash * 31 + NeedsNullableBackingField.GetHashCode();
             hash = hash * 31 + (GetterAccess?.GetHashCode() ?? 0);
+            hash = hash * 31 + HasNonPartialTypedChangedHook.GetHashCode();
+            hash = hash * 31 + (ExistingTypedChangedHookParameterTypeName?.GetHashCode() ?? 0);
+            hash = hash * 31 + (ExistingTypedChangedHookNewParameterTypeName?.GetHashCode() ?? 0);
             foreach (var attribute in PropertyAttributes)
                 hash = hash * 31 + (attribute?.GetHashCode() ?? 0);
             foreach (var propertyName in SubPropertyNotify)
