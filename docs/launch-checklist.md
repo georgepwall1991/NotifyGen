@@ -1,28 +1,23 @@
-# NotifyGen 2.0 launch checklist
+# NotifyGen 2.0 / 2.0.1 launch checklist
 
-In-repo assets for this phase live in the repo. GitHub **repository settings** (topics, Discussions) require a maintainer token with `administration` scope — cloud agents often get 403 on those writes.
-
-## Repo (done in-tree)
+## Shipped
 
 - [x] Launch post: [launch-post-2.0.md](launch-post-2.0.md)
-- [x] External channel copy: [launch-channels.md](launch-channels.md)
-- [x] Discussion templates: `.github/DISCUSSION_TEMPLATE/` (migration, show-and-tell, Q&A)
-- [x] Migration funnel elevated in root README
+- [x] Channel copy: [launch-channels.md](launch-channels.md)
+- [x] Discussion templates: `.github/DISCUSSION_TEMPLATE/`
+- [x] Migration funnel in root README
 - [x] Samples: WPF, Avalonia, MAUI, Hybrid UI
 - [x] Demo GIF: `assets/demo.gif`
-- [x] Docs site scaffold: `docs/site/` + Pages workflow
+- [x] Docs site: `docs/site/` + Docs workflow → `gh-pages`
+- [x] NuGet + GitHub release **v2.0.1**
+- [x] Announcement: https://github.com/georgepwall1991/NotifyGen/issues/17
 
-## Maintainer (manual on github.com)
+## Maintainer (admin UI)
 
-1. **Topics** — Settings → General → Topics  
-   - Remove typo `source-genertator`  
-   - Keep: `csharp`, `dotnet`, `mvvm`, `inotifypropertychanged`, `source-generators`, `roslyn`, `wpf`, `maui`, `avalonia`, `blazor`, `nuget`
-2. **Enable Discussions** — Settings → General → Features → Discussions  
-3. Seed categories (or use default + templates):
-   - Migration / Show and tell → points at migrate guide  
-   - Announcements → pin 2.0 launch post body  
-4. Create and **pin** a Discussions announcement from [launch-post-2.0.md](launch-post-2.0.md)
-5. Publish channel posts from [launch-channels.md](launch-channels.md)
+- [ ] Fix topic typo `source-genertator`
+- [ ] Enable Discussions + pin announcement
+- [ ] Enable Pages from `gh-pages`
+- [ ] Publish channel posts
 
 ## Leading indicators (weekly)
 
@@ -30,6 +25,5 @@ In-repo assets for this phase live in the repo. GitHub **repository settings** (
 |--------|--------|
 | NuGet downloads | nuget.org/packages/NotifyGen |
 | Stars / forks | GitHub About |
-| Discussion threads | Discussions tab |
-| Inbound issues | Issues |
-| Docs site traffic | GitHub Pages / referrers |
+| Discussion / issue threads | Issues #17 + Discussions |
+| Docs site traffic | GitHub Pages once enabled |
