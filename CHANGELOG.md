@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-08-11
+
+### Added
+
+- Forward explicit `[property:]`, `[get:]`, and `[set:]` field attributes onto generated properties and accessors
+- Add **NOTIFYSPR0001** / **NOTIFYSPR0002** suppressions for CS0657/CS0658 on `[Notify]` fields
+- Add Avalonia sample, CommunityToolkit hybrid sample, migration guide, and diagnostics catalog
+- Add pack-and-consume CI smoke job
+
+### Changed
+
+- Slim root README to pitch/quickstart; move full feature reference to `docs/features.md`
+
 ## [1.10.0] - 2026-08-09
 
 ### Added

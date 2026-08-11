@@ -162,6 +162,62 @@ jobs:
         path: ./nupkg/*.nupkg
         retention-days: 7
 
+    - name: Smoke consume packed analyzer
+      shell: bash
+      run: |
+        set -euo pipefail
+        smoke_dir="$(mktemp -d)"
+        package_path="$(ls -1 ./nupkg/NotifyGen.*.nupkg | head -n1)"
+        package_version="$(basename "$package_path" .nupkg | sed 's/^NotifyGen\.//')"
+        mkdir -p "$smoke_dir/feed"
+        cp "$package_path" "$smoke_dir/feed/"
+        cat > "$smoke_dir/SmokeConsumer.nuget.config" <<EOF
+        <?xml version="1.0" encoding="utf-8"?>
+        <configuration>
+          <packageSources>
+            <clear />
+            <add key="local" value="$smoke_dir/feed" />
+            <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+          </packageSources>
+        </configuration>
+        EOF
+        # Strip leading indentation from the generated nuget.config
+        sed -i 's/^        //' "$smoke_dir/SmokeConsumer.nuget.config"
+        dotnet new classlib -n SmokeConsumer -o "$smoke_dir/SmokeConsumer" --framework net8.0 --force
+        cp "$smoke_dir/SmokeConsumer.nuget.config" "$smoke_dir/SmokeConsumer/nuget.config"
+        python3 - "$smoke_dir/SmokeConsumer/SmokeConsumer.csproj" "$package_version" <<'PY'
+        import sys
+        from pathlib import Path
+        path = Path(sys.argv[1])
+        version = sys.argv[2]
+        text = path.read_text()
+        if "NotifyGen" not in text:
+            snippet = (
+                "</PropertyGroup>\n\n"
+                "  <ItemGroup>\n"
+                f'    <PackageReference Include="NotifyGen" Version="{version}" />\n'
+                "  </ItemGroup>"
+            )
+            text = text.replace("</PropertyGroup>", snippet, 1)
+            path.write_text(text)
+        PY
+        cat > "$smoke_dir/SmokeConsumer/Person.cs" <<'EOF'
+        using NotifyGen;
+        namespace SmokeConsumer;
+        [Notify]
+        public partial class Person
+        {
+            private string _name = "";
+        }
+        EOF
+        sed -i 's/^        //' "$smoke_dir/SmokeConsumer/Person.cs"
+        rm -f "$smoke_dir/SmokeConsumer/Class1.cs"
+        dotnet build "$smoke_dir/SmokeConsumer/SmokeConsumer.csproj" -c Release
+        dll="$smoke_dir/SmokeConsumer/bin/Release/net8.0/SmokeConsumer.dll"
+        test -f "$dll"
+        strings "$dll" | grep -q "INotifyPropertyChanged"
+        strings "$dll" | grep -q "get_Name"
+
   benchmarks:
     runs-on: ubuntu-latest
     needs: build

@@ -7,6 +7,7 @@ using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 using Microsoft.CodeAnalysis.Text;
 
 namespace NotifyGen.Generator;
@@ -185,7 +186,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             implementChanging,
             isSuppressable,
             alwaysNotifyProperties,
-            ExtractFields(classSymbol, ct),
+            ExtractFields(classSymbol, semanticModel.Compilation, ct),
             classSymbol.GetMembers().Select(static member => member.Name).ToImmutableArray()
         );
     }
@@ -195,6 +196,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     /// </summary>
     private static ImmutableArray<FieldInfo> ExtractFields(
         INamedTypeSymbol classSymbol,
+        Compilation compilation,
         CancellationToken ct
     )
     {
@@ -211,7 +213,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                     GeneratedPropertyNameValidation.IsValid(GetPropertyName(field))
                     && !IsFileLocalType(field.Type, ct)
                 )
-                    members.Add(CreateFieldInfo(field, ct));
+                    members.Add(CreateFieldInfo(field, compilation, ct));
             }
             else if (
                 member is IPropertySymbol property
@@ -367,6 +369,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     /// </summary>
     private static FieldInfo CreateFieldInfo(
         IFieldSymbol field,
+        Compilation compilation,
         CancellationToken cancellationToken
     )
     {
@@ -383,6 +386,14 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             propertyName,
             field.Type
         );
+        CollectForwardedAttributes(
+            field,
+            compilation,
+            cancellationToken,
+            out var propertyAttributes,
+            out var getterAttributes,
+            out var setterAttributes
+        );
 
         return new FieldInfo(
             field.Name,
@@ -394,7 +405,9 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             setterAccess,
             isPrimitiveType,
             requiresUnsafe,
-            propertyAttributes: GetForwardedPropertyAttributes(field, cancellationToken),
+            propertyAttributes: propertyAttributes,
+            getterAttributes: getterAttributes,
+            setterAttributes: setterAttributes,
             subPropertyNotify: GetSubPropertyNotifyTargets(field),
             collectionNotify: GetCollectionNotifyTargets(field),
             hasNonPartialTypedChangedHook: typedHook is not null,
@@ -628,14 +641,21 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     }
 
     /// <summary>
-    /// Gets source attributes that can legally be applied to a generated property.
+    /// Collects untargeted property-forwardable attributes plus explicit property/get/set targets.
     /// </summary>
-    private static ImmutableArray<string> GetForwardedPropertyAttributes(
+    private static void CollectForwardedAttributes(
         IFieldSymbol field,
-        CancellationToken cancellationToken
+        Compilation compilation,
+        CancellationToken cancellationToken,
+        out ImmutableArray<string> propertyAttributes,
+        out ImmutableArray<string> getterAttributes,
+        out ImmutableArray<string> setterAttributes
     )
     {
-        var forwarded = ImmutableArray.CreateBuilder<string>();
+        var property = ImmutableArray.CreateBuilder<string>();
+        var getters = ImmutableArray.CreateBuilder<string>();
+        var setters = ImmutableArray.CreateBuilder<string>();
+
         foreach (var attribute in field.GetAttributes())
         {
             if (
@@ -654,10 +674,279 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 continue;
             }
 
-            forwarded.Add(FormatAttribute(attribute));
+            property.Add(FormatAttribute(attribute));
         }
 
-        return forwarded.ToImmutable();
+        foreach (var syntaxReference in field.DeclaringSyntaxReferences)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (syntaxReference.GetSyntax(cancellationToken) is not VariableDeclaratorSyntax)
+                continue;
+
+            var tree = syntaxReference.SyntaxTree;
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var fieldDeclaration = syntaxReference
+                .GetSyntax(cancellationToken)
+                .Ancestors()
+                .OfType<FieldDeclarationSyntax>()
+                .FirstOrDefault();
+            if (fieldDeclaration is null)
+                continue;
+
+            foreach (var attributeList in fieldDeclaration.AttributeLists)
+            {
+                if (attributeList.Target?.Identifier is not { } targetToken)
+                    continue;
+
+                ImmutableArray<string>.Builder? destination = targetToken.Kind() switch
+                {
+                    SyntaxKind.PropertyKeyword => property,
+                    SyntaxKind.GetKeyword => getters,
+                    SyntaxKind.SetKeyword => setters,
+                    _ => null,
+                };
+                if (destination is null)
+                    continue;
+
+                foreach (var attributeSyntax in attributeList.Attributes)
+                {
+                    if (
+                        !TryFormatAttributeFromSyntax(
+                            attributeSyntax,
+                            semanticModel,
+                            cancellationToken,
+                            out var formatted
+                        )
+                    )
+                    {
+                        continue;
+                    }
+
+                    destination.Add(formatted);
+                }
+            }
+        }
+
+        propertyAttributes = property.ToImmutable();
+        getterAttributes = getters.ToImmutable();
+        setterAttributes = setters.ToImmutable();
+    }
+
+    private static bool TryFormatAttributeFromSyntax(
+        AttributeSyntax attributeSyntax,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out string formatted
+    )
+    {
+        formatted = string.Empty;
+        if (
+            !TryGetAttributeTypeSymbol(
+                semanticModel.GetSymbolInfo(attributeSyntax, cancellationToken),
+                out var attributeClass
+            )
+            || IsNotifyGenAttribute(attributeClass)
+            || IsFileLocalType(attributeClass, cancellationToken)
+        )
+        {
+            return false;
+        }
+
+        var constructorArguments = ImmutableArray.CreateBuilder<string>();
+        var namedArguments = ImmutableArray.CreateBuilder<string>();
+        foreach (
+            var argument in attributeSyntax.ArgumentList?.Arguments
+                ?? Enumerable.Empty<AttributeArgumentSyntax>()
+        )
+        {
+            if (!TryFormatAttributeArgumentExpression(
+                    argument.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var value
+                )
+                || ContainsFileLocalTypeFromExpression(
+                    argument.Expression,
+                    semanticModel,
+                    cancellationToken
+                )
+            )
+            {
+                return false;
+            }
+
+            if (argument.NameEquals is { } nameEquals)
+            {
+                namedArguments.Add(
+                    $"{EscapeIdentifier(nameEquals.Name.Identifier.ValueText)} = {value}"
+                );
+            }
+            else
+            {
+                constructorArguments.Add(value);
+            }
+        }
+
+        var attributeType = attributeClass.ToDisplayString(FullyQualifiedTypeDisplayFormat);
+        var allArgs = constructorArguments.Concat(namedArguments);
+        formatted = $"[{attributeType}({string.Join(", ", allArgs)})]";
+        return true;
+    }
+
+    private static bool TryGetAttributeTypeSymbol(
+        SymbolInfo symbolInfo,
+        out INamedTypeSymbol attributeClass
+    )
+    {
+        ISymbol? attributeSymbol = symbolInfo.Symbol;
+        if (attributeSymbol is null && symbolInfo.CandidateSymbols.Length == 1)
+            attributeSymbol = symbolInfo.CandidateSymbols[0];
+
+        attributeClass =
+            (attributeSymbol as INamedTypeSymbol)
+            ?? attributeSymbol?.ContainingType!;
+        return attributeClass is not null;
+    }
+
+    private static bool ContainsFileLocalTypeFromExpression(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken
+    )
+    {
+        var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken).Type;
+        if (typeInfo != null && IsFileLocalType(typeInfo, cancellationToken))
+            return true;
+
+        if (
+            expression is TypeOfExpressionSyntax typeOf
+            && semanticModel.GetTypeInfo(typeOf.Type, cancellationToken).Type is { } typeofType
+        )
+        {
+            return IsFileLocalType(typeofType, cancellationToken);
+        }
+
+        return false;
+    }
+
+    private static bool TryFormatAttributeArgumentExpression(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out string formatted
+    )
+    {
+        formatted = string.Empty;
+        if (expression is TypeOfExpressionSyntax typeOfExpression)
+        {
+            var type = semanticModel.GetTypeInfo(typeOfExpression.Type, cancellationToken).Type;
+            if (type is null)
+                return false;
+            formatted = $"typeof({FormatType(type)})";
+            return true;
+        }
+
+        var constant = semanticModel.GetConstantValue(expression, cancellationToken);
+        if (constant.HasValue)
+        {
+            formatted = FormatConstantObject(
+                constant.Value,
+                semanticModel.GetTypeInfo(expression, cancellationToken).Type
+            );
+            return true;
+        }
+
+        if (expression is ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax)
+        {
+            // Fall back to operation-based constants for simple arrays when available.
+            if (
+                semanticModel.GetOperation(expression, cancellationToken)
+                    is IArrayCreationOperation { Initializer: { } initializer }
+            )
+            {
+                var elements = new List<string>();
+                foreach (var element in initializer.ElementValues)
+                {
+                    if (element.ConstantValue.HasValue)
+                    {
+                        elements.Add(
+                            FormatConstantObject(
+                                element.ConstantValue.Value,
+                                element.Type
+                            )
+                        );
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+
+                var elementType =
+                    semanticModel.GetTypeInfo(expression, cancellationToken).Type
+                        is IArrayTypeSymbol arrayType
+                        ? FormatType(arrayType.ElementType)
+                        : "object";
+                formatted = $"new {elementType}[] {{ {string.Join(", ", elements)} }}";
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string FormatConstantObject(object? value, ITypeSymbol? type)
+    {
+        if (value is null)
+            return "null";
+
+        if (value is string s)
+            return SymbolDisplay.FormatLiteral(s, quote: true);
+
+        if (value is char c)
+            return SymbolDisplay.FormatLiteral(c, quote: true);
+
+        if (value is bool b)
+            return b ? "true" : "false";
+
+        if (value is double d)
+            return d.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "D";
+
+        if (value is float f)
+            return f.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "F";
+
+        if (value is decimal m)
+            return m.ToString(System.Globalization.CultureInfo.InvariantCulture) + "M";
+
+        if (type?.SpecialType == SpecialType.System_Byte)
+            return $"(byte){System.Convert.ToByte(value, System.Globalization.CultureInfo.InvariantCulture)}";
+
+        if (type?.SpecialType == SpecialType.System_SByte)
+            return $"(sbyte){System.Convert.ToSByte(value, System.Globalization.CultureInfo.InvariantCulture)}";
+
+        if (type?.SpecialType == SpecialType.System_Int16)
+            return $"(short){System.Convert.ToInt16(value, System.Globalization.CultureInfo.InvariantCulture)}";
+
+        if (type?.SpecialType == SpecialType.System_UInt16)
+            return $"(ushort){System.Convert.ToUInt16(value, System.Globalization.CultureInfo.InvariantCulture)}";
+
+        if (type?.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumType)
+        {
+            var name = enumType
+                .GetMembers()
+                .OfType<IFieldSymbol>()
+                .FirstOrDefault(field =>
+                    field.HasConstantValue && Equals(field.ConstantValue, value)
+                )
+                ?.Name;
+            if (name != null)
+                return $"{FormatType(enumType)}.{EscapeIdentifier(name)}";
+        }
+
+        if (value is IFormattable formattable)
+            return formattable.ToString(null, System.Globalization.CultureInfo.InvariantCulture);
+
+        return value.ToString() ?? "null";
     }
 
     private static bool ContainsFileLocalType(
@@ -1722,8 +2011,18 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         );
         sb.AppendLine($"{indent}    {{");
         var getterModifier = field.GetterAccess != null ? $"{field.GetterAccess} " : "";
-        if (hasSubPropertySubscription || hasCollectionSubscription)
+        if (
+            hasSubPropertySubscription
+            || hasCollectionSubscription
+            || !field.GetterAttributes.IsDefaultOrEmpty
+        )
         {
+            if (!field.GetterAttributes.IsDefaultOrEmpty)
+            {
+                foreach (var attribute in field.GetterAttributes)
+                    sb.AppendLine($"{indent}        {attribute}");
+            }
+
             sb.AppendLine($"{indent}        {getterModifier}get");
             sb.AppendLine($"{indent}        {{");
             if (hasSubPropertySubscription)
@@ -1738,6 +2037,11 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             sb.AppendLine($"{indent}        {getterModifier}get => {backingValue};");
         }
         var setterModifier = field.SetterAccess != null ? $"{field.SetterAccess} " : "";
+        if (!field.SetterAttributes.IsDefaultOrEmpty)
+        {
+            foreach (var attribute in field.SetterAttributes)
+                sb.AppendLine($"{indent}        {attribute}");
+        }
         sb.AppendLine($"{indent}        {setterModifier}set");
         sb.AppendLine($"{indent}        {{");
         if (hasSubPropertySubscription)
