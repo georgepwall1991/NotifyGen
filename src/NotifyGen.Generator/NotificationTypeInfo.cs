@@ -9,7 +9,9 @@ internal readonly struct NotificationTypeInfo : IEquatable<NotificationTypeInfo>
     public string Namespace { get; }
     public ImmutableArray<TypeDeclarationInfo> TypeDeclarations { get; }
     public bool AlreadyImplementsInpc { get; }
+    public PropertyChangedInvokerKind PropertyChangedInvoker { get; }
     public bool AlreadyImplementsInpcChanging { get; }
+    public PropertyChangingInvokerKind PropertyChangingInvoker { get; }
     public bool ImplementChanging { get; }
     public bool IsSuppressable { get; }
     public ImmutableArray<string> AlwaysNotifyProperties { get; }
@@ -19,13 +21,41 @@ internal readonly struct NotificationTypeInfo : IEquatable<NotificationTypeInfo>
     public bool CanGenerate =>
         TypeDeclarations.Length > 0
         && TypeDeclarations.All(static declaration => declaration.IsPartial)
-        && Fields.Length > 0;
+        && Fields.Length > 0
+        && (!AlreadyImplementsInpc || PropertyChangedInvoker != PropertyChangedInvokerKind.None)
+        && (!ImplementChanging || !AlreadyImplementsInpcChanging
+            || PropertyChangingInvoker != PropertyChangingInvokerKind.None);
 
     public NotificationTypeInfo(
         string @namespace,
         ImmutableArray<TypeDeclarationInfo> typeDeclarations,
         bool alreadyImplementsInpc,
         bool alreadyImplementsInpcChanging,
+        bool implementChanging,
+        bool isSuppressable,
+        ImmutableArray<string> alwaysNotifyProperties,
+        ImmutableArray<FieldInfo> fields
+    )
+        : this(
+            @namespace,
+            typeDeclarations,
+            alreadyImplementsInpc,
+            PropertyChangedInvokerKind.Generated,
+            alreadyImplementsInpcChanging,
+            PropertyChangingInvokerKind.Generated,
+            implementChanging,
+            isSuppressable,
+            alwaysNotifyProperties,
+            fields
+        ) { }
+
+    public NotificationTypeInfo(
+        string @namespace,
+        ImmutableArray<TypeDeclarationInfo> typeDeclarations,
+        bool alreadyImplementsInpc,
+        PropertyChangedInvokerKind propertyChangedInvoker,
+        bool alreadyImplementsInpcChanging,
+        PropertyChangingInvokerKind propertyChangingInvoker,
         bool implementChanging,
         bool isSuppressable,
         ImmutableArray<string> alwaysNotifyProperties,
@@ -36,7 +66,9 @@ internal readonly struct NotificationTypeInfo : IEquatable<NotificationTypeInfo>
         Namespace = @namespace;
         TypeDeclarations = typeDeclarations;
         AlreadyImplementsInpc = alreadyImplementsInpc;
+        PropertyChangedInvoker = propertyChangedInvoker;
         AlreadyImplementsInpcChanging = alreadyImplementsInpcChanging;
+        PropertyChangingInvoker = propertyChangingInvoker;
         ImplementChanging = implementChanging;
         IsSuppressable = isSuppressable;
         AlwaysNotifyProperties = alwaysNotifyProperties;
@@ -50,7 +82,9 @@ internal readonly struct NotificationTypeInfo : IEquatable<NotificationTypeInfo>
         Namespace == other.Namespace
         && TypeDeclarations.SequenceEqual(other.TypeDeclarations)
         && AlreadyImplementsInpc == other.AlreadyImplementsInpc
+        && PropertyChangedInvoker == other.PropertyChangedInvoker
         && AlreadyImplementsInpcChanging == other.AlreadyImplementsInpcChanging
+        && PropertyChangingInvoker == other.PropertyChangingInvoker
         && ImplementChanging == other.ImplementChanging
         && IsSuppressable == other.IsSuppressable
         && AlwaysNotifyProperties.SequenceEqual(other.AlwaysNotifyProperties)
@@ -68,7 +102,9 @@ internal readonly struct NotificationTypeInfo : IEquatable<NotificationTypeInfo>
             foreach (var declaration in TypeDeclarations)
                 hash = hash * 31 + declaration.GetHashCode();
             hash = hash * 31 + AlreadyImplementsInpc.GetHashCode();
+            hash = hash * 31 + PropertyChangedInvoker.GetHashCode();
             hash = hash * 31 + AlreadyImplementsInpcChanging.GetHashCode();
+            hash = hash * 31 + PropertyChangingInvoker.GetHashCode();
             hash = hash * 31 + ImplementChanging.GetHashCode();
             hash = hash * 31 + IsSuppressable.GetHashCode();
             foreach (var propertyName in AlwaysNotifyProperties)

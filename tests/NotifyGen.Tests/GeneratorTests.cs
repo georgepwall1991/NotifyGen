@@ -1069,8 +1069,8 @@ public class GeneratorTests
         generatedSource.Should().NotContain("public event PropertyChangedEventHandler?");
         generatedSource.Should().NotContain("public event PropertyChangingEventHandler?");
 
-        // Should still call OnPropertyChanging in setter
-        generatedSource.Should().Contain("OnPropertyChanging()");
+        // Host invokers receive an explicit property name even when their parameter is optional.
+        generatedSource.Should().Contain("OnPropertyChanging(\"Name\")");
     }
 
     [Fact]
