@@ -1,0 +1,27 @@
+title: "[Q&A] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask about NotifyGen scope, diagnostics, or the recommended hybrid stack.
+        NotifyGen is a **narrow INPC generator** — not a full MVVM framework.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+    validations:
+      required: true
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic
+      options:
+        - Why not a full MVVM toolkit?
+        - Hybrid setup help (NotifyGen + CommunityToolkit)
+        - Diagnostics / analyzer
+        - Partial properties (C# 14)
+        - Host INPC reuse
+        - Other
+    validations:
+      required: true

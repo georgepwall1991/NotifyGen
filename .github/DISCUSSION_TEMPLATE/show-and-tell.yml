@@ -1,0 +1,30 @@
+title: "[Show and tell] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Show how you use NotifyGen in a real ViewModel or sample.
+  - type: input
+    id: stack
+    attributes:
+      label: UI stack
+      description: e.g. WPF, MAUI, Avalonia, Blazor, Uno, WinUI
+      placeholder: Avalonia + CommunityToolkit.Mvvm
+    validations:
+      required: true
+  - type: textarea
+    id: snippet
+    attributes:
+      label: Snippet or link
+      description: A small ViewModel, PR, or blog post
+      render: csharp
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why NotifyGen
+      description: What made the zero-runtime / no-base-class pitch win for you?
+    validations:
+      required: false

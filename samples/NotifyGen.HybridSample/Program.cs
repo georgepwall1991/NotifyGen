@@ -1,21 +1,14 @@
-using NotifyGen.HybridSample;
+using Avalonia;
+using System;
 
-Console.WriteLine("NotifyGen + CommunityToolkit.Mvvm hybrid sample");
-Console.WriteLine("NotifyGen owns INPC; CommunityToolkit owns RelayCommand.\n");
+namespace NotifyGen.HybridSample;
 
-var vm = new EditorViewModel();
-vm.PropertyChanged += (_, e) =>
-    Console.WriteLine($"  PropertyChanged: {e.PropertyName}");
+internal static class Program
+{
+    [STAThread]
+    public static void Main(string[] args) =>
+        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
 
-Console.WriteLine($"CanSave={vm.CanSave}, SaveCommand.CanExecute={vm.SaveCommand.CanExecute(null)}");
-
-vm.Title = "Hello NotifyGen";
-Console.WriteLine($"CanSave={vm.CanSave}, SaveCommand.CanExecute={vm.SaveCommand.CanExecute(null)}");
-
-vm.Body = "Zero-runtime INPC + CT commands.";
-Console.WriteLine($"CanSave={vm.CanSave}, SaveCommand.CanExecute={vm.SaveCommand.CanExecute(null)}");
-
-if (vm.SaveCommand.CanExecute(null))
-    vm.SaveCommand.Execute(null);
-
-Console.WriteLine($"Status: {vm.Status}");
+    public static AppBuilder BuildAvaloniaApp() =>
+        AppBuilder.Configure<App>().UsePlatformDetect().LogToTrace();
+}

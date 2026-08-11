@@ -17,6 +17,16 @@
 
 Zero runtime reflection. No IL weaving. No required base class. Inspectable generated C# for WPF, MAUI, Avalonia, Uno, WinUI, and Blazor ViewModels.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/georgepwall1991/NotifyGen/master/assets/demo.gif" alt="NotifyGen binding demo: FirstName/LastName update FullName via NotifyAlso" width="560" />
+</p>
+
+## Migrating from `[ObservableProperty]`?
+
+Keep **CommunityToolkit.Mvvm** for `RelayCommand` / messaging. Use **NotifyGen** for properties — no required `ObservableObject`, zero runtime package.
+
+→ **[Migration checklist & attribute map](docs/migrate-from-communitytoolkit.md)** · [Hybrid UI sample](samples/NotifyGen.HybridSample)
+
 ## Quick start
 
 ```bash
@@ -66,11 +76,13 @@ partial void OnFirstNameChanged(string oldValue, string newValue);
 
 ## Docs
 
+- [Docs site](https://georgepwall1991.github.io/NotifyGen/) (Features, Diagnostics, Migration, Before/After)
 - [Full feature reference](docs/features.md)
 - [Migrate from CommunityToolkit `[ObservableProperty]`](docs/migrate-from-communitytoolkit.md)
 - [Diagnostics catalog](docs/diagnostics.md)
-- [Samples](samples/README.md)
+- [Samples](samples/README.md) — WPF, Avalonia, MAUI, Hybrid
 - [Changelog](CHANGELOG.md)
+- [2.0 launch post](docs/launch-post-2.0.md)
 
 ## Requirements
 

@@ -26,3 +26,6 @@ FodyWeavers.xsd
 
 # Complexity logs
 .complexity-log.md
+
+# DocFX output
+docs/site/_site/

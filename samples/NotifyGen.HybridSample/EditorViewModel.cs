@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
+using NotifyGen;
 
 namespace NotifyGen.HybridSample;
 

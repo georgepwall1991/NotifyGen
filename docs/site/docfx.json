@@ -1,0 +1,45 @@
+{
+  "$schema": "https://raw.githubusercontent.com/dotnet/docfx/main/schemas/docfx.schema.json",
+  "metadata": [],
+  "build": {
+    "content": [
+      {
+        "files": [
+          "toc.yml",
+          "index.md",
+          "features.md",
+          "diagnostics.md",
+          "migrate.md",
+          "before-after.md",
+          "samples.md"
+        ]
+      },
+      {
+        "src": "api",
+        "files": [
+          "**/*.yml"
+        ],
+        "dest": "api"
+      }
+    ],
+    "resource": [
+      {
+        "files": [
+          "assets/**"
+        ]
+      }
+    ],
+    "output": "_site",
+    "template": [
+      "default",
+      "modern"
+    ],
+    "globalMetadata": {
+      "_appName": "NotifyGen",
+      "_appTitle": "NotifyGen",
+      "_enableSearch": true,
+      "_appLogoPath": "assets/icon.png",
+      "_appFooter": "NotifyGen \u2014 zero-runtime INPC source generator"
+    }
+  }
+}
