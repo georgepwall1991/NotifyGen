@@ -1,57 +1,78 @@
-using System.Text;
+using System.Collections.ObjectModel;
 
 namespace NotifyGen.WpfSample;
 
 /// <summary>
-/// Sample ViewModel demonstrating NotifyGen features:
-/// - [Notify] for automatic INotifyPropertyChanged
-/// - [NotifyAlso] for dependent/computed properties
-/// - Partial hooks (OnXxxChanged) for custom logic
+/// Showcases Cycles 2–4: host INPC reuse, child/collection tracking, typed hooks, and suppressable bulk load.
 /// </summary>
 [Notify]
-public partial class MainViewModel
+[NotifySuppressable]
+public partial class MainViewModel : ViewModelBase
 {
-    // Using [NotifyAlso] to notify FullName when FirstName changes
-    [NotifyAlso("FullName")]
+    [NotifyAlso(nameof(FullName))]
     private string _firstName = "John";
 
-    // Using [NotifyAlso] to notify FullName when LastName changes
-    [NotifyAlso("FullName")]
+    [NotifyAlso(nameof(FullName))]
     private string _lastName = "Doe";
 
-    // Simple property - just needs the underscore prefix
     private int _age = 30;
 
-    // This field stores our log - we'll update it via partial hooks
+    [NotifyAlso(nameof(CitySummary), NotifyOnSubPropertyChanged = true)]
+    private Address? _address = new();
+
+    [NotifyAlso(nameof(TagCount), NotifyOnCollectionChanged = true)]
+    private ObservableCollection<string> _tags = new() { "wpf", "notifygen" };
+
     private string _statusLog = "Property changes will appear here...\n";
 
-    /// <summary>
-    /// Computed property that depends on FirstName and LastName.
-    /// Thanks to [NotifyAlso], this updates automatically!
-    /// </summary>
     public string FullName => $"{FirstName} {LastName}";
 
-    // Partial hook - called whenever FirstName changes
-    partial void OnFirstNameChanged()
+    public string CitySummary => Address is null ? "(no address)" : $"{Address.City}, {Address.PostalCode}";
+
+    public int TagCount => Tags.Count;
+
+    public void BulkLoadDemoData()
     {
-        LogChange(nameof(FirstName), FirstName);
+        using (SuppressNotifications())
+        {
+            FirstName = "Ada";
+            LastName = "Lovelace";
+            Age = 36;
+            Tags = new ObservableCollection<string> { "math", "computing", "poetry" };
+            Address = new Address { City = "London", PostalCode = "SW1A 1AA" };
+        }
+
+        StatusLog += "[bulk] SuppressNotifications released — dependents refresh once.\n";
     }
 
-    // Partial hook - called whenever LastName changes
-    partial void OnLastNameChanged()
+    partial void OnFirstNameChanged(string oldValue, string newValue)
     {
-        LogChange(nameof(LastName), LastName);
+        LogChange(nameof(FirstName), $"'{oldValue}' → '{newValue}'");
     }
 
-    // Partial hook - called whenever Age changes
-    partial void OnAgeChanged()
+    partial void OnLastNameChanged(string oldValue, string newValue)
     {
-        LogChange(nameof(Age), Age.ToString());
+        LogChange(nameof(LastName), $"'{oldValue}' → '{newValue}'");
     }
 
-    private void LogChange(string propertyName, string newValue)
+    partial void OnAgeChanged(int oldValue, int newValue)
+    {
+        LogChange(nameof(Age), $"{oldValue} → {newValue}");
+    }
+
+    partial void OnAddressChanged()
+    {
+        LogChange(nameof(Address), CitySummary);
+    }
+
+    partial void OnTagsChanged()
+    {
+        LogChange(nameof(Tags), $"count={TagCount}");
+    }
+
+    private void LogChange(string propertyName, string detail)
     {
         var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
-        StatusLog += $"[{timestamp}] {propertyName} = \"{newValue}\"\n";
+        StatusLog += $"[{timestamp}] {propertyName} = {detail}\n";
     }
 }

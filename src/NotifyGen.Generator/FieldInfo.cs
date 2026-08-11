@@ -9,103 +9,27 @@ namespace NotifyGen.Generator;
 /// </summary>
 internal readonly struct FieldInfo : IEquatable<FieldInfo>
 {
-    /// <summary>
-    /// The field name (e.g., "_name").
-    /// </summary>
     public string FieldName { get; }
-
-    /// <summary>
-    /// The generated property name (e.g., "Name").
-    /// </summary>
     public string PropertyName { get; }
-
-    /// <summary>
-    /// The fully qualified type name of the field.
-    /// </summary>
     public string TypeName { get; }
-
-    /// <summary>
-    /// Whether the type is nullable (reference type with ? or Nullable&lt;T&gt;).
-    /// </summary>
     public bool IsNullable { get; }
-
-    /// <summary>
-    /// Additional property names to notify when this field changes.
-    /// </summary>
     public ImmutableArray<string> AlsoNotify { get; }
-
-    /// <summary>
-    /// Direct dependent properties to notify when a child INPC raises a change.
-    /// </summary>
     public ImmutableArray<string> SubPropertyNotify { get; }
-
-    /// <summary>
-    /// Dependent properties to notify when a direct collection raises CollectionChanged.
-    /// </summary>
     public ImmutableArray<string> CollectionNotify { get; }
-
-    /// <summary>
-    /// Command names to call NotifyCanExecuteChanged() on when this field changes.
-    /// </summary>
     public ImmutableArray<string> CommandsToNotify { get; }
-
-    /// <summary>
-    /// The access modifier for the setter (e.g., "private", "protected").
-    /// Null means use the same access as the property (public).
-    /// </summary>
     public string? SetterAccess { get; }
-
-    /// <summary>
-    /// Whether the type is a primitive value type (int, bool, double, etc.)
-    /// that supports direct == comparison for better performance.
-    /// </summary>
     public bool IsPrimitiveType { get; }
-
-    /// <summary>
-    /// Whether emitting this field's type requires an unsafe declaration context.
-    /// </summary>
     public bool RequiresUnsafe { get; }
-
-    /// <summary>
-    /// Whether this metadata describes an incomplete partial property rather than a field.
-    /// </summary>
     public bool IsPartialProperty { get; }
-
-    /// <summary>
-    /// The accessibility of the declared property.
-    /// </summary>
     public string PropertyAccessibility { get; }
-
-    /// <summary>
-    /// Whether a partial property's synthesized field needs nullable-flow attributes.
-    /// </summary>
     public bool NeedsNullableBackingField { get; }
-
-    /// <summary>
-    /// An explicit getter accessibility modifier, if any.
-    /// </summary>
     public string? GetterAccess { get; }
-
-    /// <summary>
-    /// Whether a non-partial user method already implements the typed Changed hook.
-    /// </summary>
     public bool HasNonPartialTypedChangedHook { get; }
-
-    /// <summary>
-    /// The existing ordinary hook parameter type when it differs only by metadata
-    /// annotations from the generated property type.
-    /// </summary>
     public string? ExistingTypedChangedHookParameterTypeName { get; }
-
-    /// <summary>
-    /// The second existing ordinary hook parameter type when it differs from the generated type.
-    /// </summary>
     public string? ExistingTypedChangedHookNewParameterTypeName { get; }
-
-    /// <summary>
-    /// Source attributes that are valid on the generated property.
-    /// </summary>
     public ImmutableArray<string> PropertyAttributes { get; }
+    public ImmutableArray<string> GetterAttributes { get; }
+    public ImmutableArray<string> SetterAttributes { get; }
 
     public FieldInfo(
         string fieldName,
@@ -122,6 +46,8 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         bool needsNullableBackingField = false,
         string? getterAccess = null,
         ImmutableArray<string> propertyAttributes = default,
+        ImmutableArray<string> getterAttributes = default,
+        ImmutableArray<string> setterAttributes = default,
         ImmutableArray<string> subPropertyNotify = default,
         ImmutableArray<string> collectionNotify = default,
         bool hasNonPartialTypedChangedHook = false,
@@ -134,7 +60,6 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         TypeName = typeName;
         IsNullable = isNullable;
         AlsoNotify = alsoNotify;
-        SubPropertyNotify = subPropertyNotify;
         CommandsToNotify = commandsToNotify;
         SetterAccess = setterAccess;
         IsPrimitiveType = isPrimitiveType;
@@ -149,6 +74,12 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         PropertyAttributes = propertyAttributes.IsDefault
             ? ImmutableArray<string>.Empty
             : propertyAttributes;
+        GetterAttributes = getterAttributes.IsDefault
+            ? ImmutableArray<string>.Empty
+            : getterAttributes;
+        SetterAttributes = setterAttributes.IsDefault
+            ? ImmutableArray<string>.Empty
+            : setterAttributes;
         SubPropertyNotify = subPropertyNotify.IsDefault
             ? ImmutableArray<string>.Empty
             : subPropertyNotify;
@@ -173,6 +104,8 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             NeedsNullableBackingField,
             GetterAccess,
             PropertyAttributes,
+            GetterAttributes,
+            SetterAttributes,
             SubPropertyNotify,
             CollectionNotify,
             HasNonPartialTypedChangedHook,
@@ -197,16 +130,15 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             && ExistingTypedChangedHookParameterTypeName == other.ExistingTypedChangedHookParameterTypeName
             && ExistingTypedChangedHookNewParameterTypeName == other.ExistingTypedChangedHookNewParameterTypeName
             && PropertyAttributes.SequenceEqual(other.PropertyAttributes)
+            && GetterAttributes.SequenceEqual(other.GetterAttributes)
+            && SetterAttributes.SequenceEqual(other.SetterAttributes)
             && SubPropertyNotify.SequenceEqual(other.SubPropertyNotify)
             && CollectionNotify.SequenceEqual(other.CollectionNotify)
             && AlsoNotify.SequenceEqual(other.AlsoNotify)
             && CommandsToNotify.SequenceEqual(other.CommandsToNotify);
     }
 
-    public override bool Equals(object? obj)
-    {
-        return obj is FieldInfo other && Equals(other);
-    }
+    public override bool Equals(object? obj) => obj is FieldInfo other && Equals(other);
 
     public override int GetHashCode()
     {
@@ -228,6 +160,10 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             hash = hash * 31 + (ExistingTypedChangedHookParameterTypeName?.GetHashCode() ?? 0);
             hash = hash * 31 + (ExistingTypedChangedHookNewParameterTypeName?.GetHashCode() ?? 0);
             foreach (var attribute in PropertyAttributes)
+                hash = hash * 31 + (attribute?.GetHashCode() ?? 0);
+            foreach (var attribute in GetterAttributes)
+                hash = hash * 31 + (attribute?.GetHashCode() ?? 0);
+            foreach (var attribute in SetterAttributes)
                 hash = hash * 31 + (attribute?.GetHashCode() ?? 0);
             foreach (var propertyName in SubPropertyNotify)
                 hash = hash * 31 + (propertyName?.GetHashCode() ?? 0);

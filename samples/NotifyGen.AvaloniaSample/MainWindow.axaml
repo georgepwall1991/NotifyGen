@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:NotifyGen.AvaloniaSample"
+        x:Class="NotifyGen.AvaloniaSample.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="NotifyGen Avalonia Sample"
+        Width="560" Height="420">
+  <Design.DataContext>
+    <vm:MainViewModel />
+  </Design.DataContext>
+
+  <StackPanel Margin="24" Spacing="12">
+    <TextBlock Text="NotifyGen + Avalonia" FontSize="22" FontWeight="Bold"/>
+    <TextBlock Text="Host INPC reuse, child notify, collection membership, suppressable bulk load."
+               Opacity="0.75" TextWrapping="Wrap"/>
+
+    <StackPanel Spacing="8">
+      <DockPanel>
+        <TextBlock Width="120" Text="First name" VerticalAlignment="Center"/>
+        <TextBox Text="{Binding FirstName}"/>
+      </DockPanel>
+      <DockPanel>
+        <TextBlock Width="120" Text="Last name" VerticalAlignment="Center"/>
+        <TextBox Text="{Binding LastName}"/>
+      </DockPanel>
+      <DockPanel>
+        <TextBlock Width="120" Text="Full name" VerticalAlignment="Center" FontWeight="SemiBold"/>
+        <TextBlock Text="{Binding FullName}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+      </DockPanel>
+      <DockPanel>
+        <TextBlock Width="120" Text="City" VerticalAlignment="Center"/>
+        <TextBox Text="{Binding Address.City}"/>
+      </DockPanel>
+      <DockPanel>
+        <TextBlock Width="120" Text="Items" VerticalAlignment="Center"/>
+        <TextBlock Text="{Binding ItemCount, StringFormat={}{0} items}" VerticalAlignment="Center"/>
+      </DockPanel>
+    </StackPanel>
+
+    <Button Content="Bulk reload with SuppressNotifications()" Click="BulkReload_Click"/>
+    <Border Background="#F0F4F8" Padding="12" CornerRadius="6">
+      <TextBlock Text="{Binding Status}" TextWrapping="Wrap" FontFamily="Consolas"/>
+    </Border>
+  </StackPanel>
+</Window>

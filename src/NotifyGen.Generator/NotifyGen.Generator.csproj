@@ -12,7 +12,7 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>NotifyGen</PackageId>
-    <Version>1.10.0</Version>
+    <Version>2.0.0</Version>
     <Authors>George Wall</Authors>
     <Title>NotifyGen - INotifyPropertyChanged Source Generator</Title>
     <Description>A fast INotifyPropertyChanged source generator for .NET. Eliminates MVVM boilerplate with a single [Notify] attribute, no runtime dependency, full IntelliSense, and debuggable generated code.
@@ -23,6 +23,7 @@ Features:
 • Partial hooks: On{Property}Changing(oldValue, newValue) and On{Property}Changed()
 • [NotifyAlso] for dependent properties, child changes, and collection membership
 • Reuse existing INPC host invokers without duplicate events or runtime dependencies
+• Forward [property:]/[get:]/[set:] field attributes onto generated members
 • [NotifySetter] for access control (private, protected, internal)
 • INotifyPropertyChanging support for undo/redo scenarios
 • [NotifyCanExecuteChangedFor] for automatic command refresh
@@ -38,23 +39,19 @@ Features:
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>v1.10.0:
+    <PackageReleaseNotes>v2.0.0:
+• Forward [property:]/[get:]/[set:] field attributes onto generated properties and accessors
+• Suppress CS0657/CS0658 for accessor-target metadata on [Notify] fields (NOTIFYSPR0001/0002)
+• Adoption assets: Avalonia + CommunityToolkit hybrid samples, migration guide, diagnostics catalog
+
+v1.10.0:
 • Reuse accessible existing INPC and INPC-changing host invokers without duplicate interfaces, events, or helpers
 • Add direct NotifyOnCollectionChanged membership tracking with replacement/null detach handling and target deduplication
 • Add NOTIFY013-NOTIFY017 safety diagnostics for incompatible hosts, collection declarations, and invalid generated names
 
 v1.9.0:
 • Add explicit target-side [NotifyAlso(NotifyFrom = true)] dependency declarations with transitive graph validation
-• Add typed On{Property}Changed(oldValue, newValue) post-change hooks with equality suppression and field/partial-property support
-
-v1.8.0:
-• Forward property-targetable field attributes with bound constructor and named values
-• Opt into direct child INotifyPropertyChanged notifications with NotifyOnSubPropertyChanged and NOTIFY010 guidance
-
-v1.7.0:
-• Generate C# 14/preview partial properties from [Notify] without a runtime dependency
-• Support [NotifyAlso] on partial properties and reject ambiguous generated names with NOTIFY009
-• Expand transitive [NotifyAlso] dependencies with cycle diagnostics (NOTIFY008)</PackageReleaseNotes>
+• Add typed On{Property}Changed(oldValue, newValue) post-change hooks with equality suppression and field/partial-property support</PackageReleaseNotes>
     <Copyright>Copyright (c) 2025-2026 George Wall</Copyright>
 
     <!-- Analyzer/Generator packaging -->
