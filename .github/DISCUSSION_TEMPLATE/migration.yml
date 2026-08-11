@@ -1,0 +1,35 @@
+title: "[Migration] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share a CommunityToolkit → NotifyGen migration, or ask for help.
+        Guide: [docs/migrate-from-communitytoolkit.md](https://github.com/georgepwall1991/NotifyGen/blob/master/docs/migrate-from-communitytoolkit.md)
+  - type: textarea
+    id: before
+    attributes:
+      label: Before (CommunityToolkit)
+      description: Relevant ViewModel snippet using `[ObservableProperty]` / ObservableObject
+      render: csharp
+    validations:
+      required: false
+  - type: textarea
+    id: after
+    attributes:
+      label: After (NotifyGen) or question
+      description: Your NotifyGen attempt, or what you want to keep on CommunityToolkit (commands, messenger, etc.)
+      render: csharp
+    validations:
+      required: true
+  - type: dropdown
+    id: goal
+    attributes:
+      label: Goal
+      options:
+        - Migrated successfully (show and tell)
+        - Need help migrating properties
+        - Hybrid setup (NotifyGen + RelayCommand)
+        - Deciding whether to migrate
+    validations:
+      required: true

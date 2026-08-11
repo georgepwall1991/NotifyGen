@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:NotifyGen.MauiSample"
+             x:Class="NotifyGen.MauiSample.MainPage"
+             x:DataType="vm:MainViewModel"
+             Title="NotifyGen MAUI Sample">
+  <ScrollView>
+    <VerticalStackLayout Padding="24" Spacing="12">
+      <Label Text="NotifyGen + MAUI" FontSize="22" FontAttributes="Bold" />
+      <Label Text="Host INPC reuse, child notify, collection membership, suppressable bulk load."
+             Opacity="0.75" />
+
+      <Label Text="First name" />
+      <Entry Text="{Binding FirstName}" />
+      <Label Text="Last name" />
+      <Entry Text="{Binding LastName}" />
+      <Label Text="{Binding FullName}" FontAttributes="Bold" FontSize="18" />
+
+      <Label Text="City" />
+      <Entry Text="{Binding Address.City}" />
+      <Label Text="{Binding ItemCount, StringFormat='{0} items'}" />
+
+      <Button Text="Bulk reload with SuppressNotifications()" Clicked="OnBulkReload" />
+      <Border StrokeThickness="0" BackgroundColor="{StaticResource Panel}" Padding="12">
+        <Label Text="{Binding Status}" LineBreakMode="WordWrap" />
+      </Border>
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>

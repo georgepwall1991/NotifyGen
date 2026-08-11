@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- MAUI sample (`samples/NotifyGen.MauiSample`) mirroring WPF/Avalonia host INPC patterns
+- Hybrid Avalonia UI sample (NotifyGen properties + CommunityToolkit `RelayCommand`)
+- Docs site scaffold (`docs/site/`) with before/after generated-code page and GitHub Pages workflow
+- Discussion templates (migration, show-and-tell, Q&A) and 2.0 launch checklist / channel copy
+- README demo GIF (`assets/demo.gif`) and elevated CommunityToolkit migration funnel
+- Cycle 6 demand-gated research scaffold (`docs/research/cycle-6.md`)
+
+### Changed
+
+- Split `NotifyGenerator` into partials (Discovery, Hooks, Attributes, Formatting, Emission, Subscriptions)
+- Refresh complexity log for the new generator layout
+
 ## [2.0.0] - 2026-08-11
 
 ### Added

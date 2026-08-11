@@ -129,7 +129,7 @@ public partial class EditorViewModel
 }
 ```
 
-See the Avalonia UI hybrid sample: [`samples/NotifyGen.HybridSample`](../samples/NotifyGen.HybridSample).
+See the Avalonia UI hybrid sample: [`samples/NotifyGen.HybridSample`](https://github.com/georgepwall1991/NotifyGen/tree/master/samples/NotifyGen.HybridSample).
 
 ## What NotifyGen will not become
 

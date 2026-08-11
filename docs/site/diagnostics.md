@@ -1,0 +1,30 @@
+# NotifyGen diagnostics
+
+| Id | Severity | Meaning | Typical fix |
+|----|----------|---------|-------------|
+| **NOTIFY001** | Error | `[Notify]` type is not `partial` | Add `partial` |
+| **NOTIFY002** | Warning | No eligible underscore fields / incomplete partial properties | Add `_field` members or incomplete partial properties |
+| **NOTIFY003** | Warning | `[NotifyAlso]` names an unknown property | Fix the name or declare the dependent |
+| **NOTIFY004** | Info | Static/const field cannot generate a property | Remove static/const or add `[NotifyIgnore]` |
+| **NOTIFY005** | Info | Readonly field cannot generate a setter | Remove `readonly` or add `[NotifyIgnore]` |
+| **NOTIFY006** | Error | Containing type of a nested `[Notify]` type is not partial | Make every container `partial` |
+| **NOTIFY007** | Error | File-local type cannot be extended from generated source | Remove `file` accessibility |
+| **NOTIFY008** | Error | `[NotifyAlso]` dependency cycle | Break the cycle |
+| **NOTIFY009** | Error | Two members generate the same property name | Rename one member / `[NotifyName]` |
+| **NOTIFY010** | Warning | `NotifyOnSubPropertyChanged` on a non-INPC reference | Use a reference type implementing `INotifyPropertyChanged` |
+| **NOTIFY011** | Warning | Target-side `NotifyFrom` names a non-generated source | Point at a NotifyGen-generated property |
+| **NOTIFY012** | Warning | Target-side `NotifyAlso` cannot use `NotifyOnSubPropertyChanged` | Put child tracking on the source member |
+| **NOTIFY013** | Error | Existing INPC host has no callable `OnPropertyChanged` invoker | Add an accessible string/EventArgs invoker |
+| **NOTIFY014** | Warning | Target-side `NotifyAlso` cannot use `NotifyOnCollectionChanged` | Put collection tracking on the source member |
+| **NOTIFY015** | Warning | `NotifyOnCollectionChanged` requires a reference value | Use a reference-typed collection |
+| **NOTIFY016** | Error | Generated property name is not a valid identifier | Fix `[NotifyName]` / field naming |
+| **NOTIFY017** | Error | Existing INPC-changing host has no callable `OnPropertyChanging` invoker | Add an accessible changing invoker |
+
+## Suppressions
+
+| Id | Suppresses | When |
+|----|------------|------|
+| **NOTIFYSPR0001** | CS0657 | `[property: …]` on a field inside a `[Notify]` type |
+| **NOTIFYSPR0002** | CS0658 | `[get: …]` / `[set: …]` on a field inside a `[Notify]` type |
+
+Code fix: **NOTIFY001** / **NOTIFY006** offer **Make type partial**.

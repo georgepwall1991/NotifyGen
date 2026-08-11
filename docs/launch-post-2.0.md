@@ -5,8 +5,8 @@ NotifyGen is a narrow Roslyn source generator for `INotifyPropertyChanged`. One 
 ## What 2.0 adds
 
 - **Accessor-target metadata:** write `[property: JsonPropertyName("x")]`, `[get: Obsolete]`, or `[set: MemberNotNull(...)]` on fields; NotifyGen emits them on the generated property/accessors and suppresses CS0657/CS0658.
-- **Adoption assets:** WPF + Avalonia samples for host INPC, child/collection notify, and suppressable bulk load; a hybrid sample that pairs NotifyGen properties with CommunityToolkit `RelayCommand`.
-- **Docs:** migrate-from-CommunityToolkit guide and a full diagnostics catalog.
+- **Adoption assets:** WPF, Avalonia, and MAUI samples for host INPC, child/collection notify, and suppressable bulk load; a hybrid UI sample that pairs NotifyGen properties with CommunityToolkit `RelayCommand`.
+- **Docs:** migrate-from-CommunityToolkit guide, diagnostics catalog, and a browsable docs site with generated-code before/after.
 
 ## Recommended stack
 
@@ -23,6 +23,12 @@ public partial class EditorViewModel
 }
 ```
 
+## Migrating from `[ObservableProperty]`?
+
+Keep CT for commands and messengers. Swap property generation in one ViewModel first — attribute map and checklist:
+
+→ [Migrate from CommunityToolkit](migrate-from-communitytoolkit.md)
+
 ## Get it
 
 ```bash
@@ -30,4 +36,10 @@ dotnet add package NotifyGen
 ```
 
 Repo: https://github.com/georgepwall1991/NotifyGen  
-NuGet: https://www.nuget.org/packages/NotifyGen/
+NuGet: https://www.nuget.org/packages/NotifyGen/  
+Samples: https://github.com/georgepwall1991/NotifyGen/tree/master/samples  
+Docs site: https://georgepwall1991.github.io/NotifyGen/
+
+## Channel checklist
+
+See [launch-checklist.md](launch-checklist.md) and [launch-channels.md](launch-channels.md).

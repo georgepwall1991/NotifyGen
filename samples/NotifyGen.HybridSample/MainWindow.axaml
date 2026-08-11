@@ -1,0 +1,33 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:NotifyGen.HybridSample"
+        x:Class="NotifyGen.HybridSample.MainWindow"
+        x:DataType="vm:EditorViewModel"
+        Title="NotifyGen + CommunityToolkit"
+        Width="560" Height="420">
+  <Design.DataContext>
+    <vm:EditorViewModel />
+  </Design.DataContext>
+
+  <StackPanel Margin="24" Spacing="14">
+    <TextBlock Text="NotifyGen + CommunityToolkit" FontSize="22" FontWeight="Bold"/>
+    <TextBlock Text="NotifyGen owns INPC properties. CommunityToolkit owns RelayCommand."
+               Opacity="0.75" TextWrapping="Wrap"/>
+
+    <StackPanel Spacing="8">
+      <TextBlock Text="Title"/>
+      <TextBox Text="{Binding Title}"/>
+      <TextBlock Text="Body"/>
+      <TextBox Text="{Binding Body}" AcceptsReturn="True" Height="100" TextWrapping="Wrap"/>
+      <TextBlock>
+        <Run Text="CanSave: "/>
+        <Run Text="{Binding CanSave}"/>
+      </TextBlock>
+    </StackPanel>
+
+    <Button Content="Save" Command="{Binding SaveCommand}" HorizontalAlignment="Left" Padding="16,8"/>
+    <Border Background="#1A2438" Padding="12" CornerRadius="6">
+      <TextBlock Text="{Binding Status}" TextWrapping="Wrap"/>
+    </Border>
+  </StackPanel>
+</Window>
