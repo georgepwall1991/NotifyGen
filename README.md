@@ -25,12 +25,19 @@ Zero runtime reflection. No IL weaving. No required base class. Inspectable gene
 
 Keep **CommunityToolkit.Mvvm** for `RelayCommand` / messaging. Use **NotifyGen** for properties — no required `ObservableObject`, zero runtime package.
 
-→ **[Migration checklist & attribute map](docs/migrate-from-communitytoolkit.md)** · [Hybrid UI sample](samples/NotifyGen.HybridSample)
+→ **[Migration checklist & attribute map](https://github.com/georgepwall1991/NotifyGen/blob/master/docs/migrate-from-communitytoolkit.md)** · [Hybrid UI sample](https://github.com/georgepwall1991/NotifyGen/tree/master/samples/NotifyGen.HybridSample)
 
 ## Quick start
 
 ```bash
 dotnet add package NotifyGen
+```
+
+```xml
+<PackageReference Include="NotifyGen" Version="2.0.2">
+  <PrivateAssets>all</PrivateAssets>
+  <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+</PackageReference>
 ```
 
 ```csharp
@@ -64,7 +71,7 @@ partial void OnFirstNameChanged(string oldValue, string newValue);
 | Required base class | No (reuses host INPC) | `ObservableObject` typical | No |
 | Scope | Narrow INPC generator | Full MVVM toolkit | Property weaver |
 
-**Recommended stack:** NotifyGen for properties, CommunityToolkit for `RelayCommand` / messaging. See the [hybrid sample](samples/NotifyGen.HybridSample).
+**Recommended stack:** NotifyGen for properties, CommunityToolkit for `RelayCommand` / messaging. See the [hybrid sample](https://github.com/georgepwall1991/NotifyGen/tree/master/samples/NotifyGen.HybridSample).
 
 ## Highlights
 
@@ -72,17 +79,18 @@ partial void OnFirstNameChanged(string oldValue, string newValue);
 - `[NotifyAlso]` with transitive closure, target-side `NotifyFrom`, child INPC, and collection membership
 - Typed `On{Property}Changed(old, new)` hooks, changing events, suppressable bulk updates
 - Property / `property:` / `get:` / `set:` metadata forwarding
-- Analyzer diagnostics **NOTIFY001–NOTIFY017** + code fixes
+- Analyzer diagnostics **NOTIFY001–NOTIFY017**; code fixes for missing `partial` (**NOTIFY001** / **NOTIFY006**), underscore field names (**NOTIFY002**), and unknown `[NotifyAlso]` names (**NOTIFY003**)
 
 ## Docs
 
-- [Docs site](https://georgepwall1991.github.io/NotifyGen/) (Features, Diagnostics, Migration, Before/After)
-- [Full feature reference](docs/features.md)
-- [Migrate from CommunityToolkit `[ObservableProperty]`](docs/migrate-from-communitytoolkit.md)
-- [Diagnostics catalog](docs/diagnostics.md)
-- [Samples](samples/README.md) — WPF, Avalonia, MAUI, Hybrid
-- [Changelog](CHANGELOG.md)
-- [2.0 launch post](docs/launch-post-2.0.md)
+- [Full feature reference](https://github.com/georgepwall1991/NotifyGen/blob/master/docs/features.md)
+- [Migrate from CommunityToolkit `[ObservableProperty]`](https://github.com/georgepwall1991/NotifyGen/blob/master/docs/migrate-from-communitytoolkit.md)
+- [Diagnostics catalog](https://github.com/georgepwall1991/NotifyGen/blob/master/docs/diagnostics.md)
+- [Samples](https://github.com/georgepwall1991/NotifyGen/blob/master/samples/README.md) — WPF, Avalonia, MAUI, Hybrid
+- [Changelog](https://github.com/georgepwall1991/NotifyGen/blob/master/CHANGELOG.md)
+- [2.0 launch post](https://github.com/georgepwall1991/NotifyGen/blob/master/docs/launch-post-2.0.md)
+
+The GitHub Pages site is generated from `docs/site/` once Pages is enabled from the `gh-pages` branch. Until then the documents above are the source of truth.
 
 ## Requirements
 
@@ -91,4 +99,4 @@ partial void OnFirstNameChanged(string oldValue, string newValue);
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](https://github.com/georgepwall1991/NotifyGen/blob/master/LICENSE).

@@ -944,7 +944,7 @@ NotifyGen includes analyzers that catch mistakes at compile time:
 | NOTIFY016 | Error | Requested generated property name is not a valid C# identifier | — |
 | NOTIFY017 | Error | Existing INPC changing host has no callable `OnPropertyChanging` invoker | — |
 
-**NOTIFY001 and NOTIFY006 have a code fix** — click the lightbulb (or press `Ctrl+.` / `Cmd+.`) and select "Make type partial" to add the required modifier.
+**NOTIFY001 and NOTIFY006 have a code fix** — click the lightbulb (or press `Ctrl+.` / `Cmd+.`) and select "Make type partial" to add the required modifier. **NOTIFY002** prefixes private instance fields with `_`. **NOTIFY003** replaces a nearby unknown `[NotifyAlso]` name.
 
 ## Performance
 

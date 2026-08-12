@@ -130,13 +130,17 @@ public class AnalyzerTests
 
         var diagnostics = await GetDiagnosticsAsync(source);
 
-        var diagnostic = diagnostics.Should().ContainSingle(diagnostic =>
-            diagnostic.Id == "NOTIFY010"
-        ).Subject;
+        var diagnostic = diagnostics
+            .Should()
+            .ContainSingle(diagnostic => diagnostic.Id == "NOTIFY010")
+            .Subject;
         diagnostic.Severity.Should().Be(DiagnosticSeverity.Warning);
         diagnostic.GetMessage().Should().Contain("_name");
-        SourceText.From(source).ToString(diagnostic.Location.SourceSpan)
-            .Should().Contain("NotifyAlso");
+        SourceText
+            .From(source)
+            .ToString(diagnostic.Location.SourceSpan)
+            .Should()
+            .Contain("NotifyAlso");
     }
 
     [Fact]
@@ -349,8 +353,11 @@ public class AnalyzerTests
         var diagnostic = diagnostics.Should().ContainSingle(d => d.Id == "NOTIFY008").Subject;
         diagnostic.Severity.Should().Be(DiagnosticSeverity.Error);
         diagnostic.GetMessage().Should().Contain("FirstName").And.Contain("LastName");
-        SourceText.From(source).ToString(diagnostic.Location.SourceSpan)
-            .Should().Contain("NotifyAlso");
+        SourceText
+            .From(source)
+            .ToString(diagnostic.Location.SourceSpan)
+            .Should()
+            .Contain("NotifyAlso");
     }
 
     [Fact]
@@ -1302,7 +1309,99 @@ public class AnalyzerTests
         var fixableIds = codeFixer.FixableDiagnosticIds;
 
         // Assert
-        fixableIds.Should().BeEquivalentTo("NOTIFY001", "NOTIFY006");
+        fixableIds.Should().BeEquivalentTo("NOTIFY001", "NOTIFY002", "NOTIFY003", "NOTIFY006");
+    }
+
+    [Fact]
+    public async Task CodeFix_NoEligibleFields_PrefixesPrivateFieldWithUnderscore()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class Person
+                {
+                    private string name;
+                }
+            }
+            """;
+
+        var fixedSource = await ApplyCodeFixAsync(source, "NOTIFY002");
+
+        fixedSource.Should().Contain("private string _name;");
+        fixedSource.Should().NotContain("private string name;");
+    }
+
+    [Fact]
+    public async Task CodeFix_NoEligibleFields_DoesNotRenameWhenNoPrivateInstanceFields()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class Empty
+                {
+                    public string publicField;
+                }
+            }
+            """;
+
+        var fixedSource = await ApplyCodeFixAsync(source, "NOTIFY002");
+
+        fixedSource.Should().Be(source);
+    }
+
+    [Fact]
+    public async Task CodeFix_UnknownNotifyAlso_ReplacesWithClosestPropertyName()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class Person
+                {
+                    [NotifyAlso("FullNam")]
+                    private string _firstName;
+
+                    public string FullName => FirstName;
+                }
+            }
+            """;
+
+        var fixedSource = await ApplyCodeFixAsync(source, "NOTIFY003");
+
+        fixedSource.Should().Contain("""[NotifyAlso("FullName")]""");
+        fixedSource.Should().NotContain("""[NotifyAlso("FullNam")]""");
+    }
+
+    [Fact]
+    public async Task CodeFix_UnknownNotifyAlso_DoesNotGuessWhenNoCloseMatch()
+    {
+        var source = """
+            using NotifyGen;
+
+            namespace TestNamespace
+            {
+                [Notify]
+                public partial class Person
+                {
+                    [NotifyAlso("CompletelyUnrelated")]
+                    private string _firstName;
+
+                    public string FullName => FirstName;
+                }
+            }
+            """;
+
+        var fixedSource = await ApplyCodeFixAsync(source, "NOTIFY003");
+
+        fixedSource.Should().Contain("""[NotifyAlso("CompletelyUnrelated")]""");
     }
 
     [Fact]
