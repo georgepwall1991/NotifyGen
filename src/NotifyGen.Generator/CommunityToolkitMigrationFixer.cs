@@ -186,33 +186,33 @@ internal static class CommunityToolkitMigrationFixer
                     continue;
                 }
 
-                if (attribute.ConstructorArguments.FirstOrDefault().Value is not string name)
-                    continue;
-
-                var property = typeSymbol
-                    .GetMembers(name)
-                    .OfType<IPropertySymbol>()
-                    .FirstOrDefault();
-                if (property is not { IsIndexer: false, SetMethod: null })
-                    continue;
-
-                var source = member switch
+                foreach (var name in GetConstructorStringArguments(attribute))
                 {
-                    IFieldSymbol field => NotifyMemberSelection.GetGeneratedPropertyName(field),
-                    IPropertySymbol sourceProperty => sourceProperty.Name,
-                    _ => null,
-                };
-                if (source is null)
-                    continue;
+                    var property = typeSymbol
+                        .GetMembers(name)
+                        .OfType<IPropertySymbol>()
+                        .FirstOrDefault();
+                    if (property is not { IsIndexer: false, SetMethod: null })
+                        continue;
 
-                if (!sourcesByTarget.TryGetValue(name, out var sources))
-                {
-                    sources = new List<string>();
-                    sourcesByTarget[name] = sources;
+                    var source = member switch
+                    {
+                        IFieldSymbol field => NotifyMemberSelection.GetGeneratedPropertyName(field),
+                        IPropertySymbol sourceProperty => sourceProperty.Name,
+                        _ => null,
+                    };
+                    if (source is null)
+                        continue;
+
+                    if (!sourcesByTarget.TryGetValue(name, out var sources))
+                    {
+                        sources = new List<string>();
+                        sourcesByTarget[name] = sources;
+                    }
+
+                    if (!sources.Contains(source, StringComparer.Ordinal))
+                        sources.Add(source);
                 }
-
-                if (!sources.Contains(source, StringComparer.Ordinal))
-                    sources.Add(source);
             }
         }
 
@@ -231,6 +231,9 @@ internal static class CommunityToolkitMigrationFixer
     )
     {
         if (member is not (FieldDeclarationSyntax or PropertyDeclarationSyntax))
+            return member;
+
+        if (MemberHasUnsupportedCommunityToolkitCompanion(member, model, cancellationToken))
             return member;
 
         var remaining = new List<AttributeListSyntax>();
@@ -255,12 +258,10 @@ internal static class CommunityToolkitMigrationFixer
                 if (typeName == NotifyMemberSelection.NotifyPropertyChangedForAttributeName)
                 {
                     touched = true;
-                    if (
-                        GetFirstStringArgument(attribute) is { } target
-                        && !computedSources.ContainsKey(target)
-                    )
+                    foreach (var target in GetStringArguments(attribute))
                     {
-                        alsoNotify.Add(target);
+                        if (!computedSources.ContainsKey(target))
+                            alsoNotify.Add(target);
                     }
 
                     continue;
@@ -298,7 +299,7 @@ internal static class CommunityToolkitMigrationFixer
 
         if (sawOptIn && !HasSimpleAttribute(remaining, "NotifyProperty"))
         {
-            remaining.Insert(0, SimpleAttributeList("NotifyProperty"));
+            remaining.Insert(0, SimpleAttributeList("NotifyGen.NotifyProperty"));
         }
 
         foreach (var name in alsoNotify.Distinct(StringComparer.Ordinal))
@@ -351,6 +352,61 @@ internal static class CommunityToolkitMigrationFixer
             info.Symbol as IMethodSymbol
             ?? info.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault();
         return method?.ContainingType.ToDisplayString();
+    }
+
+    private static IEnumerable<string> GetConstructorStringArguments(AttributeData attribute)
+    {
+        foreach (var argument in attribute.ConstructorArguments)
+        {
+            if (argument.Kind == TypedConstantKind.Array)
+            {
+                foreach (var value in argument.Values)
+                {
+                    if (value.Value is string name && !string.IsNullOrEmpty(name))
+                        yield return name;
+                }
+            }
+            else if (argument.Value is string name && !string.IsNullOrEmpty(name))
+            {
+                yield return name;
+            }
+        }
+    }
+
+    private static IEnumerable<string> GetStringArguments(AttributeSyntax attribute)
+    {
+        foreach (
+            var argument in attribute.ArgumentList?.Arguments
+                ?? Enumerable.Empty<AttributeArgumentSyntax>()
+        )
+        {
+            if (GetFirstStringArgumentFromExpression(argument.Expression) is { } name)
+                yield return name;
+        }
+    }
+
+    private static bool MemberHasUnsupportedCommunityToolkitCompanion(
+        MemberDeclarationSyntax member,
+        SemanticModel model,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (var list in member.AttributeLists)
+        {
+            foreach (var attribute in list.Attributes)
+            {
+                var typeName = GetAttributeTypeName(attribute, model, cancellationToken);
+                if (
+                    typeName == NotifyMemberSelection.NotifyPropertyChangedRecipientsAttributeName
+                    || typeName == NotifyMemberSelection.NotifyDataErrorInfoAttributeName
+                )
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static string? GetFirstStringArgument(AttributeSyntax attribute)
@@ -512,7 +568,7 @@ internal static class CommunityToolkitMigrationFixer
     private static AttributeListSyntax SimpleAttributeList(string name) =>
         SyntaxFactory.AttributeList(
             SyntaxFactory.SingletonSeparatedList(
-                SyntaxFactory.Attribute(SyntaxFactory.IdentifierName(name))
+                SyntaxFactory.Attribute(SyntaxFactory.ParseName(name))
             )
         );
 

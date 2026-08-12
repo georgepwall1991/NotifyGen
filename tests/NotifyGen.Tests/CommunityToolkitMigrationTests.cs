@@ -26,13 +26,23 @@ public class CommunityToolkitMigrationTests
             [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = true)]
             public sealed class NotifyPropertyChangedForAttribute : Attribute
             {
-                public NotifyPropertyChangedForAttribute(string propertyName) { }
+                public NotifyPropertyChangedForAttribute(params string[] propertyNames) { }
             }
 
             [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = true)]
             public sealed class NotifyCanExecuteChangedForAttribute : Attribute
             {
                 public NotifyCanExecuteChangedForAttribute(string commandName) { }
+            }
+
+            [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
+            public sealed class NotifyPropertyChangedRecipientsAttribute : Attribute
+            {
+            }
+
+            [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
+            public sealed class NotifyDataErrorInfoAttribute : Attribute
+            {
             }
         }
         """;
@@ -238,7 +248,7 @@ public class CommunityToolkitMigrationTests
         var fixedSource = await ApplyCodeFixAsync(source, "NOTIFY023");
 
         fixedSource.Should().Contain("[Notify]");
-        fixedSource.Should().Contain("[NotifyProperty]");
+        fixedSource.Should().Contain("NotifyProperty");
         fixedSource.Should().NotContain("[ObservableProperty]");
         fixedSource.Should().Contain("private bool _disposed");
         fixedSource.Should().Contain("using NotifyGen");
@@ -270,13 +280,79 @@ public class CommunityToolkitMigrationTests
 
         var fixedSource = await ApplyCodeFixAsync(source, "NOTIFY022");
 
-        fixedSource.Should().Contain("[NotifyProperty]");
+        fixedSource.Should().Contain("NotifyProperty");
         fixedSource.Should().NotContain("[ObservableProperty]");
         fixedSource.Should().NotContain("[NotifyPropertyChangedFor");
         fixedSource.Should().Contain("[NotifyComputed");
         fixedSource.Should().Contain("nameof(FirstName)");
         fixedSource.Should().Contain("nameof(LastName)");
         fixedSource.Should().Contain("public string FullName");
+    }
+
+    [Fact]
+    public async Task CodeFix_Notify022_ConvertsEveryNotifyPropertyChangedForArgument()
+    {
+        var source = WithCommunityToolkit(
+            """
+            using CommunityToolkit.Mvvm.ComponentModel;
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [ObservableProperty]
+                [NotifyPropertyChangedFor(nameof(FullName), nameof(Display))]
+                private string _firstName;
+
+                public string FullName => FirstName;
+                public string Display => FirstName;
+            }
+            """
+        );
+
+        var fixedSource = await ApplyCodeFixAsync(source, "NOTIFY022");
+
+        fixedSource.Should().Contain("[NotifyComputed(nameof(FirstName))]");
+        System
+            .Text.RegularExpressions.Regex.Matches(
+                fixedSource,
+                @"\[NotifyComputed\(nameof\(FirstName\)\)\]"
+            )
+            .Count.Should()
+            .Be(2);
+        fixedSource.Should().NotContain("[NotifyPropertyChangedFor");
+    }
+
+    [Fact]
+    public async Task CodeFix_Notify022_LeavesObservablePropertyOnRecipientsMembers()
+    {
+        var source = WithCommunityToolkit(
+            """
+            using CommunityToolkit.Mvvm.ComponentModel;
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                [ObservableProperty]
+                [NotifyPropertyChangedRecipients]
+                private string _title;
+
+                [ObservableProperty]
+                private string _body;
+            }
+            """
+        );
+
+        var fixedSource = await ApplyCodeFixAsync(source, "NOTIFY022");
+
+        fixedSource.Should().Contain("[NotifyPropertyChangedRecipients]");
+        fixedSource.Should().Contain("[ObservableProperty]");
+        fixedSource.Should().Contain("NotifyGen.NotifyProperty");
+        var (_, _, runResult) = GeneratorTestHelper.RunGeneratorAndAssertCompiles(fixedSource);
+        var generated = GeneratorTestHelper.GetGeneratedSource(runResult, "Person.g.cs");
+        generated.Should().Contain("public string Body");
+        generated.Should().NotContain("public string Title");
     }
 
     [Fact]
@@ -513,9 +589,9 @@ public class CommunityToolkitMigrationTests
             ("Second.cs", second)
         );
 
-        documents["First.cs"].Should().Contain("[NotifyProperty]");
+        documents["First.cs"].Should().Contain("NotifyProperty");
         documents["First.cs"].Should().NotContain("[ObservableProperty]");
-        documents["Second.cs"].Should().Contain("[NotifyProperty]");
+        documents["Second.cs"].Should().Contain("NotifyProperty");
         documents["Second.cs"].Should().NotContain("[ObservableProperty]");
         documents["Second.cs"].Should().Contain("public object SaveCommand");
         (documents["First.cs"] + documents["Second.cs"]).Should().Contain("[Notify]");
@@ -546,7 +622,7 @@ public class CommunityToolkitMigrationTests
 
         fixedSource.Should().NotContain("[ObservableProperty]");
         System
-            .Text.RegularExpressions.Regex.Matches(fixedSource, @"\[NotifyProperty\]")
+            .Text.RegularExpressions.Regex.Matches(fixedSource, @"NotifyGen\.NotifyProperty")
             .Count.Should()
             .Be(2);
     }

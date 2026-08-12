@@ -21,6 +21,10 @@ internal static class NotifyMemberSelection
         "CommunityToolkit.Mvvm.ComponentModel.NotifyPropertyChangedForAttribute";
     internal const string CommunityToolkitNotifyCanExecuteChangedForAttributeName =
         "CommunityToolkit.Mvvm.ComponentModel.NotifyCanExecuteChangedForAttribute";
+    internal const string NotifyPropertyChangedRecipientsAttributeName =
+        "CommunityToolkit.Mvvm.ComponentModel.NotifyPropertyChangedRecipientsAttribute";
+    internal const string NotifyDataErrorInfoAttributeName =
+        "CommunityToolkit.Mvvm.ComponentModel.NotifyDataErrorInfoAttribute";
 
     public static bool TypeUsesOptIn(
         INamedTypeSymbol type,
@@ -125,6 +129,9 @@ internal static class NotifyMemberSelection
         if (FieldEligibilityClassifier.Classify(field) == FieldEligibility.Ignored)
             return false;
 
+        if (HasUnsupportedCommunityToolkitCompanion(field))
+            return false;
+
         if (!typeUsesOptIn)
             return FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible;
 
@@ -140,7 +147,27 @@ internal static class NotifyMemberSelection
         if (!PartialPropertyEligibility.IsSupported(property, cancellationToken))
             return false;
 
+        if (HasUnsupportedCommunityToolkitCompanion(property))
+            return false;
+
         return !typeUsesOptIn || HasOptInMarker(property);
+    }
+
+    public static bool HasUnsupportedCommunityToolkitCompanion(ISymbol member)
+    {
+        foreach (var attribute in member.GetAttributes())
+        {
+            var name = attribute.AttributeClass?.ToDisplayString();
+            if (
+                name == NotifyPropertyChangedRecipientsAttributeName
+                || name == NotifyDataErrorInfoAttributeName
+            )
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static bool IsOptInFieldShape(IFieldSymbol field)
