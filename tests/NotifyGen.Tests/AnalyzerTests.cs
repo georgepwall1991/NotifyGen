@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Reflection;
 using FluentAssertions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
@@ -1381,6 +1382,30 @@ public class AnalyzerTests
     }
 
     [Fact]
+    public async Task CodeFix_UnknownNotifyComputedSecondArgument_ReplacesOnlyTheTypo()
+    {
+        var source = """
+            using NotifyGen;
+
+            [Notify]
+            public partial class Person
+            {
+                private string _firstName = string.Empty;
+                private string _lastName = string.Empty;
+
+                [NotifyComputed(nameof(FirstName), nameof(LastNme))]
+                public string FullName => $"{FirstName} {LastName}";
+            }
+            """;
+
+        var fixedSource = await ApplyCodeFixAsync(source, "NOTIFY003");
+
+        fixedSource.Should().Contain("nameof(FirstName)");
+        fixedSource.Should().Contain("nameof(LastName)");
+        fixedSource.Should().NotContain("nameof(LastNme)");
+    }
+
+    [Fact]
     public async Task CodeFix_UnknownNotifyAlso_DoesNotGuessWhenNoCloseMatch()
     {
         var source = """
@@ -1628,6 +1653,25 @@ public class AnalyzerTests
         descriptor.Category.Should().Be("NotifyGen");
         descriptor.DefaultSeverity.Should().Be(DiagnosticSeverity.Error);
         descriptor.IsEnabledByDefault.Should().BeTrue();
+    }
+
+    [Fact]
+    public void DiagnosticDescriptors_NotifyComputed_HaveCorrectIds()
+    {
+        GetDescriptor("NotifyComputedEmptyDependencies").Id.Should().Be("NOTIFY018");
+        GetDescriptor("NotifyComputedOnGeneratedMember").Id.Should().Be("NOTIFY019");
+        GetDescriptor("NotifyComputedRequiresGetOnlyProperty").Id.Should().Be("NOTIFY020");
+        GetDescriptor("NotifyComputedUnsupportedGetter").Id.Should().Be("NOTIFY021");
+    }
+
+    private static DiagnosticDescriptor GetDescriptor(string fieldName)
+    {
+        var field = typeof(DiagnosticDescriptors).GetField(
+            fieldName,
+            BindingFlags.Public | BindingFlags.Static
+        );
+        field.Should().NotBeNull($"DiagnosticDescriptors.{fieldName} should exist");
+        return (DiagnosticDescriptor)field!.GetValue(null)!;
     }
 
     #endregion

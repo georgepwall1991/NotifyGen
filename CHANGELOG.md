@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-08-12
+
+### Added
+
+- `[NotifyComputed]` wires `PropertyChanged` for a read-only derived property from a bounded getter walk or an explicit DependsOn list
+- **NOTIFY018** / **NOTIFY019** / **NOTIFY021** for empty, generated-member, and unsupported computed getters
+- Computed-property runtime and generator benchmarks
+
+### Changed
+
+- Samples and conversion docs show `[NotifyComputed]` as the default FullName / CanSave pattern
+
 ## [2.0.2] - 2026-08-12
 
 ### Added

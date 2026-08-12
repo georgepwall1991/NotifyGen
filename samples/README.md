@@ -9,3 +9,5 @@
 | [NotifyGen.HybridSample](NotifyGen.HybridSample) | Avalonia UI: NotifyGen properties + CommunityToolkit `RelayCommand` |
 
 Recommended production stack: **NotifyGen for INPC**, **CommunityToolkit.Mvvm for commands**.
+
+`[NotifyComputed]` on `FullName` / `CanSave` is the 2.1 pattern; the console sample uses explicit DependsOn because its `FullName` getter uses LINQ.

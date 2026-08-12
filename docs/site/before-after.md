@@ -10,12 +10,10 @@ using NotifyGen;
 [Notify]
 public partial class Person
 {
-    [NotifyAlso(nameof(FullName))]
     private string _firstName;
-
-    [NotifyAlso(nameof(FullName))]
     private string _lastName;
 
+    [NotifyComputed]
     public string FullName => $"{FirstName} {LastName}";
 
     partial void OnFirstNameChanged(string oldValue, string newValue);

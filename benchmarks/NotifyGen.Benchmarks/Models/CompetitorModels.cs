@@ -85,3 +85,48 @@ public class FodyViewModel
     public string? Email { get; set; }
     public bool IsActive { get; set; }
 }
+
+[Notify]
+public partial class NotifyGenComputedViewModel
+{
+    private string _firstName = "Ada";
+    private string _lastName = "Lovelace";
+
+    [NotifyComputed]
+    public string FullName => $"{FirstName} {LastName}";
+}
+
+[Notify]
+public partial class NotifyGenExplicitViewModel
+{
+    [NotifyAlso(nameof(FullName))]
+    private string _firstName = "Ada";
+
+    [NotifyAlso(nameof(FullName))]
+    private string _lastName = "Lovelace";
+
+    public string FullName => $"{FirstName} {LastName}";
+}
+
+public partial class CommunityToolkitComputedViewModel : ObservableObject
+{
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FullName))]
+    private string _firstName = "Ada";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FullName))]
+    private string _lastName = "Lovelace";
+
+    public string FullName => $"{FirstName} {LastName}";
+}
+
+[AddINotifyPropertyChangedInterface]
+public class FodyComputedViewModel
+{
+    public string FirstName { get; set; } = "Ada";
+    public string LastName { get; set; } = "Lovelace";
+
+    [DependsOn(nameof(FirstName), nameof(LastName))]
+    public string FullName => $"{FirstName} {LastName}";
+}

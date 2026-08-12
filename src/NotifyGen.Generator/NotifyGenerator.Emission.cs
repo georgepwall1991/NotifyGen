@@ -126,7 +126,9 @@ public sealed partial class NotifyGenerator
         if (classInfo.IsSuppressable && classInfo.AlreadyImplementsInpc)
         {
             sb.AppendLine();
-            sb.AppendLine($"{indent}    private void __notifyGenRaisePropertyChanged(string propertyName)");
+            sb.AppendLine(
+                $"{indent}    private void __notifyGenRaisePropertyChanged(string propertyName)"
+            );
             sb.AppendLine($"{indent}    {{");
             if (classInfo.AlwaysNotifyProperties.Length > 0)
             {
@@ -154,6 +156,9 @@ public sealed partial class NotifyGenerator
         // Generate child-property subscription state and handlers.
         foreach (var field in classInfo.Fields)
         {
+            if (field.IsComputedTarget)
+                continue;
+
             if (HasSubPropertySubscription(field))
             {
                 GenerateSubPropertyMembers(
@@ -182,6 +187,9 @@ public sealed partial class NotifyGenerator
         // Generate properties
         foreach (var field in classInfo.Fields)
         {
+            if (field.IsComputedTarget)
+                continue;
+
             GenerateProperty(
                 sb,
                 field,
@@ -247,6 +255,9 @@ public sealed partial class NotifyGenerator
         // Generate partial hooks
         foreach (var field in classInfo.Fields)
         {
+            if (field.IsComputedTarget)
+                continue;
+
             sb.AppendLine(
                 $"{indent}    partial void On{field.PropertyName}Changing({field.TypeName} oldValue, {field.TypeName} newValue);"
             );
@@ -526,23 +537,21 @@ public sealed partial class NotifyGenerator
         var oldValueArgument = isDynamicType
             ? $"((global::System.Object?){oldValueLocalName})!"
             : oldValueLocalName;
-        var newValueArgument = isDynamicType
-            ? "((global::System.Object?)value)!"
-            : "value";
+        var newValueArgument = isDynamicType ? "((global::System.Object?)value)!" : "value";
         var changingOldValueArgument = isDynamicType ? oldValueArgument : backingValue;
         var changingNewValueArgument = isDynamicType ? newValueArgument : "value";
         var existingOldHookType = field.ExistingTypedChangedHookParameterTypeName;
         var existingNewHookType = field.ExistingTypedChangedHookNewParameterTypeName;
-        var typedOldValueArgument = existingOldHookType is not null
-            ? $"({existingOldHookType})({EnsureNonNull(oldValueArgument)})"
-            : field.IsNullable && !isDynamicType
-                ? $"{oldValueArgument}!"
-                : oldValueArgument;
-        var typedNewValueArgument = existingNewHookType is not null
-            ? $"({existingNewHookType})({EnsureNonNull(newValueArgument)})"
-            : field.IsNullable && !isDynamicType
-                ? $"{newValueArgument}!"
-                : newValueArgument;
+        var typedOldValueArgument =
+            existingOldHookType is not null
+                ? $"({existingOldHookType})({EnsureNonNull(oldValueArgument)})"
+            : field.IsNullable && !isDynamicType ? $"{oldValueArgument}!"
+            : oldValueArgument;
+        var typedNewValueArgument =
+            existingNewHookType is not null
+                ? $"({existingNewHookType})({EnsureNonNull(newValueArgument)})"
+            : field.IsNullable && !isDynamicType ? $"{newValueArgument}!"
+            : newValueArgument;
         sb.AppendLine($"{indent}            var {oldValueLocalName} = {backingValue};");
         // Fire PropertyChanging event if enabled
         if (implementChanging)
@@ -605,5 +614,4 @@ public sealed partial class NotifyGenerator
         sb.AppendLine($"{indent}        }}");
         sb.AppendLine($"{indent}    }}");
     }
-
 }

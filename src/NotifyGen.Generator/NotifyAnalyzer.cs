@@ -37,7 +37,11 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.NotifyAlsoTargetCollectionUnsupported,
             DiagnosticDescriptors.NotifyAlsoCollectionRequiresReference,
             DiagnosticDescriptors.InvalidGeneratedPropertyName,
-            DiagnosticDescriptors.ExistingInpcChangingRequiresInvoker
+            DiagnosticDescriptors.ExistingInpcChangingRequiresInvoker,
+            DiagnosticDescriptors.NotifyComputedEmptyDependencies,
+            DiagnosticDescriptors.NotifyComputedOnGeneratedMember,
+            DiagnosticDescriptors.NotifyComputedRequiresGetOnlyProperty,
+            DiagnosticDescriptors.NotifyComputedUnsupportedGetter
         );
 
     public override void Initialize(AnalysisContext context)
@@ -198,12 +202,8 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         );
         if (
             inpcChangingType is null
-            || !classSymbol.AllInterfaces.Contains(
-                inpcChangingType,
-                SymbolEqualityComparer.Default
-            )
-            || PropertyChangingInvoker.Find(classSymbol)
-                != PropertyChangingInvokerKind.None
+            || !classSymbol.AllInterfaces.Contains(inpcChangingType, SymbolEqualityComparer.Default)
+            || PropertyChangingInvoker.Find(classSymbol) != PropertyChangingInvokerKind.None
         )
         {
             return;
@@ -239,7 +239,11 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                         context.ReportDiagnostic(
                             Diagnostic.Create(
                                 DiagnosticDescriptors.InvalidGeneratedPropertyName,
-                                GetSymbolLocation(field, classDeclaration, context.CancellationToken),
+                                GetSymbolLocation(
+                                    field,
+                                    classDeclaration,
+                                    context.CancellationToken
+                                ),
                                 field.Name,
                                 propertyName
                             )
@@ -300,19 +304,16 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         {
             var propertyName = member switch
             {
-                IFieldSymbol field when
-                    FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible
-                    => GetPropertyName(field),
-                IPropertySymbol property when
-                    IsIncompletePartialProperty(property, context.CancellationToken)
-                    => property.Name,
+                IFieldSymbol field
+                    when FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible =>
+                    GetPropertyName(field),
+                IPropertySymbol property
+                    when IsIncompletePartialProperty(property, context.CancellationToken) =>
+                    property.Name,
                 _ => null,
             };
 
-            if (
-                propertyName == null
-                || !GeneratedPropertyNameValidation.IsValid(propertyName)
-            )
+            if (propertyName == null || !GeneratedPropertyNameValidation.IsValid(propertyName))
                 continue;
 
             if (generatedNames.ContainsKey(propertyName))
@@ -379,6 +380,12 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                 generatedMembers[property.Name] = property;
         }
 
+        var computedNames = classSymbol
+            .GetMembers()
+            .OfType<IPropertySymbol>()
+            .Where(ComputedDependencyWalker.HasAttribute)
+            .Select(static property => property.Name)
+            .ToImmutableHashSet(StringComparer.Ordinal);
         var allKnownProperties = existingProperties.Union(generatedMembers.Keys);
         var inpcType = context.SemanticModel.Compilation.GetTypeByMetadataName(
             "System.ComponentModel.INotifyPropertyChanged"
@@ -387,9 +394,12 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         var analyzedMembers = generatedMembers.ToList();
         foreach (var property in classSymbol.GetMembers().OfType<IPropertySymbol>())
         {
+            if (generatedMembers.ContainsKey(property.Name))
+                continue;
+
             if (
-                !generatedMembers.ContainsKey(property.Name)
-                && GetNotifyAlsoAttributes(property).Any(RequestsNotifyFrom)
+                ComputedDependencyWalker.HasAttribute(property)
+                || GetNotifyAlsoAttributes(property).Any(RequestsNotifyFrom)
             )
             {
                 analyzedMembers.Add(new KeyValuePair<string, ISymbol>(property.Name, property));
@@ -400,7 +410,8 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         {
             foreach (var attribute in GetNotifyAlsoAttributes(generatedMember.Value))
             {
-                var referencedName = attribute.ConstructorArguments.FirstOrDefault().Value as string;
+                var referencedName =
+                    attribute.ConstructorArguments.FirstOrDefault().Value as string;
                 if (string.IsNullOrEmpty(referencedName))
                     continue;
 
@@ -412,6 +423,27 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                     attribute,
                     context.CancellationToken
                 );
+
+                if (
+                    !notifyFrom
+                    && ComputedDependencyWalker.HasAttribute(generatedMember.Value)
+                    && (
+                        RequestsSubPropertyNotification(attribute)
+                        || RequestsCollectionNotification(attribute)
+                    )
+                )
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            RequestsSubPropertyNotification(attribute)
+                                ? DiagnosticDescriptors.NotifyAlsoTargetSubPropertyUnsupported
+                                : DiagnosticDescriptors.NotifyAlsoTargetCollectionUnsupported,
+                            location,
+                            generatedMember.Key
+                        )
+                    );
+                    continue;
+                }
 
                 if (RequestsCollectionNotification(attribute))
                 {
@@ -463,7 +495,11 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                     );
                 }
 
-                if (notifyFrom && !generatedMembers.ContainsKey(sourceName))
+                if (
+                    notifyFrom
+                    && !generatedMembers.ContainsKey(sourceName)
+                    && !computedNames.Contains(sourceName)
+                )
                 {
                     if (!allKnownProperties.Contains(sourceName))
                     {
@@ -504,21 +540,157 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                     continue;
                 }
 
-                if (generatedMembers.ContainsKey(sourceName))
+                if (generatedMembers.ContainsKey(sourceName) || computedNames.Contains(sourceName))
                 {
                     edges.Add(
-                        new DependencyEdge(
-                            sourceName,
-                            targetName,
-                            generatedMember.Value,
-                            attribute
-                        )
+                        new DependencyEdge(sourceName, targetName, generatedMember.Value, attribute)
                     );
                 }
             }
         }
 
+        CollectComputedDependencyEdges(
+            context,
+            classSymbol,
+            generatedMembers,
+            allKnownProperties,
+            edges
+        );
+
         ReportDependencyCycle(context, edges.ToImmutable());
+    }
+
+    private static void CollectComputedDependencyEdges(
+        SyntaxNodeAnalysisContext context,
+        INamedTypeSymbol classSymbol,
+        IReadOnlyDictionary<string, ISymbol> generatedMembers,
+        IEnumerable<string> allKnownProperties,
+        ImmutableArray<DependencyEdge>.Builder edges
+    )
+    {
+        var fieldToProperty = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var field in classSymbol.GetMembers().OfType<IFieldSymbol>())
+        {
+            if (
+                FieldEligibilityClassifier.Classify(field) != FieldEligibility.Eligible
+                || !GeneratedPropertyNameValidation.IsValid(GetPropertyName(field))
+            )
+            {
+                continue;
+            }
+
+            fieldToProperty[field.Name] = GetPropertyName(field);
+        }
+
+        var computedNames = classSymbol
+            .GetMembers()
+            .OfType<IPropertySymbol>()
+            .Where(ComputedDependencyWalker.HasAttribute)
+            .Select(static candidate => candidate.Name)
+            .ToImmutableHashSet(StringComparer.Ordinal);
+
+        foreach (var property in classSymbol.GetMembers().OfType<IPropertySymbol>())
+        {
+            if (!ComputedDependencyWalker.HasAttribute(property))
+                continue;
+
+            var walk = ComputedDependencyWalker.Analyze(
+                property,
+                context.SemanticModel,
+                classSymbol,
+                fieldToProperty,
+                candidate => IsIncompletePartialProperty(candidate, context.CancellationToken),
+                context.CancellationToken
+            );
+            var location = GetAttributeLocation(
+                property,
+                walk.Attribute ?? ComputedDependencyWalker.GetAttribute(property)!,
+                context.CancellationToken
+            );
+
+            switch (walk.Status)
+            {
+                case ComputedWalkStatus.OnGeneratedMember:
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.NotifyComputedOnGeneratedMember,
+                            location,
+                            property.Name
+                        )
+                    );
+                    continue;
+                case ComputedWalkStatus.WritableTarget:
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.NotifyComputedRequiresGetOnlyProperty,
+                            location,
+                            property.Name
+                        )
+                    );
+                    continue;
+                case ComputedWalkStatus.Unsupported:
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.NotifyComputedUnsupportedGetter,
+                            location,
+                            property.Name
+                        )
+                    );
+                    continue;
+                case ComputedWalkStatus.Empty:
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.NotifyComputedEmptyDependencies,
+                            location,
+                            property.Name
+                        )
+                    );
+                    continue;
+            }
+
+            foreach (var sourceName in walk.Dependencies)
+            {
+                if (
+                    !allKnownProperties.Contains(sourceName)
+                    && !generatedMembers.ContainsKey(sourceName)
+                )
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.UnknownNotifyAlsoProperty,
+                            GetComputedDependencyArgumentLocation(
+                                property,
+                                walk.Attribute ?? ComputedDependencyWalker.GetAttribute(property),
+                                sourceName,
+                                location,
+                                context.CancellationToken
+                            ),
+                            property.Name,
+                            sourceName
+                        )
+                    );
+                    continue;
+                }
+
+                if (
+                    !generatedMembers.ContainsKey(sourceName) && !computedNames.Contains(sourceName)
+                )
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.NotifyAlsoTargetRequiresGeneratedSource,
+                            location,
+                            property.Name,
+                            sourceName
+                        )
+                    );
+                    continue;
+                }
+
+                var attribute = walk.Attribute ?? ComputedDependencyWalker.GetAttribute(property)!;
+                edges.Add(new DependencyEdge(sourceName, property.Name, property, attribute));
+            }
+        }
     }
 
     private static bool RequestsCollectionNotification(AttributeData attribute) =>
@@ -542,8 +714,7 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
 
     private static bool RequestsSubPropertyNotification(AttributeData attribute) =>
         attribute.NamedArguments.Any(named =>
-            named.Key == "NotifyOnSubPropertyChanged"
-            && named.Value.Value is true
+            named.Key == "NotifyOnSubPropertyChanged" && named.Value.Value is true
         );
 
     private static bool RequestsNotifyFrom(AttributeData attribute) =>
@@ -579,7 +750,10 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             && typeParameter.ConstraintTypes.Any(constraint =>
                 SymbolEqualityComparer.Default.Equals(constraint, inpcType)
                 || constraint is INamedTypeSymbol namedConstraint
-                    && namedConstraint.AllInterfaces.Contains(inpcType, SymbolEqualityComparer.Default)
+                    && namedConstraint.AllInterfaces.Contains(
+                        inpcType,
+                        SymbolEqualityComparer.Default
+                    )
             );
     }
 
@@ -647,9 +821,7 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                         if (targetColor == 1)
                         {
                             var cycleStart = stack.IndexOf(edge.Target);
-                            var cycle = stack
-                                .Skip(cycleStart)
-                                .Concat(new[] { edge.Target });
+                            var cycle = stack.Skip(cycleStart).Concat(new[] { edge.Target });
                             var location = GetAttributeLocation(
                                 edge.Member,
                                 edge.Attribute,
@@ -687,12 +859,7 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         public ISymbol Member { get; }
         public AttributeData Attribute { get; }
 
-        public DependencyEdge(
-            string source,
-            string target,
-            ISymbol member,
-            AttributeData attribute
-        )
+        public DependencyEdge(string source, string target, ISymbol member, AttributeData attribute)
         {
             Source = source;
             Target = target;
@@ -712,6 +879,52 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                 ?.GetSyntax(cancellationToken)
                 .GetLocation()
             ?? classDeclaration.Identifier.GetLocation();
+    }
+
+    private static Location GetComputedDependencyArgumentLocation(
+        ISymbol member,
+        AttributeData? attribute,
+        string sourceName,
+        Location fallback,
+        System.Threading.CancellationToken cancellationToken
+    )
+    {
+        if (
+            attribute?.ApplicationSyntaxReference?.GetSyntax(cancellationToken)
+                is not AttributeSyntax syntax
+            || syntax.ArgumentList is null
+        )
+        {
+            return fallback;
+        }
+
+        foreach (var argument in syntax.ArgumentList.Arguments)
+        {
+            if (argument.NameEquals is not null)
+                continue;
+
+            var text = argument.Expression switch
+            {
+                LiteralExpressionSyntax literal
+                    when literal.IsKind(SyntaxKind.StringLiteralExpression) => literal
+                    .Token
+                    .ValueText,
+                InvocationExpressionSyntax invocation
+                    when invocation.Expression is IdentifierNameSyntax identifier
+                        && identifier.Identifier.ValueText == "nameof"
+                        && invocation.ArgumentList.Arguments.Count == 1 => invocation
+                    .ArgumentList.Arguments[0]
+                    .Expression.ToString()
+                    .Split('.')
+                    .Last(),
+                _ => null,
+            };
+
+            if (string.Equals(text, sourceName, StringComparison.Ordinal))
+                return argument.GetLocation();
+        }
+
+        return fallback;
     }
 
     private static Location GetAttributeLocation(

@@ -8,6 +8,8 @@
 | [MAUI](https://github.com/georgepwall1991/NotifyGen/tree/master/samples/NotifyGen.MauiSample) | Same patterns on .NET MAUI (workload required) |
 | [Hybrid](https://github.com/georgepwall1991/NotifyGen/tree/master/samples/NotifyGen.HybridSample) | Avalonia UI — NotifyGen properties + CommunityToolkit `RelayCommand` |
 
+`[NotifyComputed]` is the 2.1 derived-property pattern in these samples.
+
 Clone and run:
 
 ```bash

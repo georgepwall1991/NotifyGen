@@ -24,6 +24,7 @@ public class DiscoverabilityMetadataTests
             .Should()
             .MatchRegex("(?i)(no required|without).{0,40}(ObservableObject|base class)");
         description.Should().MatchRegex("(?i)CommunityToolkit");
+        description.Should().MatchRegex("(?i)computed");
     }
 
     [Fact]
@@ -45,7 +46,7 @@ public class DiscoverabilityMetadataTests
     public void Package_Version_IsPatchAheadOfPublishedTwoOhOne()
     {
         var version = GetCsprojProperty("Version");
-        Version.Parse(version).Should().BeGreaterThan(Version.Parse("2.0.1"));
+        Version.Parse(version).Should().BeGreaterThanOrEqualTo(Version.Parse("2.1.0"));
     }
 
     [Fact]
@@ -56,7 +57,8 @@ public class DiscoverabilityMetadataTests
         readme.Should().Contain("## Migrating from `[ObservableProperty]`?");
         readme.Should().Contain("## Quick start");
         readme.Should().Contain("PrivateAssets");
-        readme.Should().Contain("2.0.2");
+        readme.Should().Contain("2.1.0");
+        readme.Should().Contain("NotifyComputed");
         readme.Should().Contain("NOTIFY001");
         readme.Should().NotContain("georgepwall1991.github.io/NotifyGen");
 

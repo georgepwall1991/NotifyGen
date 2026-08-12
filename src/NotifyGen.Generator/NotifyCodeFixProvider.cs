@@ -115,7 +115,12 @@ public sealed class NotifyCodeFixProvider : CodeFixProvider
         if (attribute?.ArgumentList is null || attribute.ArgumentList.Arguments.Count == 0)
             return;
 
-        var argument = attribute.ArgumentList.Arguments[0];
+        var argument =
+            root.FindToken(diagnostic.Location.SourceSpan.Start)
+                .Parent?.AncestorsAndSelf()
+                .OfType<AttributeArgumentSyntax>()
+                .FirstOrDefault()
+            ?? attribute.ArgumentList.Arguments[0];
         var referencedName = GetReferencedName(argument.Expression);
         if (string.IsNullOrEmpty(referencedName))
             return;

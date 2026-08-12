@@ -34,7 +34,7 @@ dotnet add package NotifyGen
 ```
 
 ```xml
-<PackageReference Include="NotifyGen" Version="2.0.2">
+<PackageReference Include="NotifyGen" Version="2.1.0">
   <PrivateAssets>all</PrivateAssets>
   <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
 </PackageReference>
@@ -46,12 +46,10 @@ using NotifyGen;
 [Notify]
 public partial class Person
 {
-    [NotifyAlso(nameof(FullName))]
     private string _firstName;
-
-    [NotifyAlso(nameof(FullName))]
     private string _lastName;
 
+    [NotifyComputed]
     public string FullName => $"{FirstName} {LastName}";
 }
 ```
@@ -76,10 +74,11 @@ partial void OnFirstNameChanged(string oldValue, string newValue);
 ## Highlights
 
 - Field → property (`_name` → `Name`) and C# 14 partial-property mode
+- `[NotifyComputed]` wires derived properties from the getter (or an explicit DependsOn list)
 - `[NotifyAlso]` with transitive closure, target-side `NotifyFrom`, child INPC, and collection membership
 - Typed `On{Property}Changed(old, new)` hooks, changing events, suppressable bulk updates
 - Property / `property:` / `get:` / `set:` metadata forwarding
-- Analyzer diagnostics **NOTIFY001–NOTIFY017**; code fixes for missing `partial` (**NOTIFY001** / **NOTIFY006**), underscore field names (**NOTIFY002**), and unknown `[NotifyAlso]` names (**NOTIFY003**)
+- Analyzer diagnostics **NOTIFY001–NOTIFY021**; code fixes for missing `partial` (**NOTIFY001** / **NOTIFY006**), underscore field names (**NOTIFY002**), and unknown `[NotifyAlso]` names (**NOTIFY003**)
 
 ## Docs
 

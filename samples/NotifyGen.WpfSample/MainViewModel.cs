@@ -9,10 +9,8 @@ namespace NotifyGen.WpfSample;
 [NotifySuppressable]
 public partial class MainViewModel : ViewModelBase
 {
-    [NotifyAlso(nameof(FullName))]
     private string _firstName = "John";
 
-    [NotifyAlso(nameof(FullName))]
     private string _lastName = "Doe";
 
     private int _age = 30;
@@ -25,9 +23,11 @@ public partial class MainViewModel : ViewModelBase
 
     private string _statusLog = "Property changes will appear here...\n";
 
+    [NotifyComputed]
     public string FullName => $"{FirstName} {LastName}";
 
-    public string CitySummary => Address is null ? "(no address)" : $"{Address.City}, {Address.PostalCode}";
+    public string CitySummary =>
+        Address is null ? "(no address)" : $"{Address.City}, {Address.PostalCode}";
 
     public int TagCount => Tags.Count;
 
