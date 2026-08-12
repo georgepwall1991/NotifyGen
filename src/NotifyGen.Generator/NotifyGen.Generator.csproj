@@ -12,7 +12,7 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>NotifyGen</PackageId>
-    <Version>2.2.0</Version>
+    <Version>2.2.1</Version>
     <Authors>George Wall</Authors>
     <Title>NotifyGen - INotifyPropertyChanged Source Generator</Title>
     <Description>Compile-time INotifyPropertyChanged source generator for .NET. One [Notify] attribute generates equality-guarded properties with no runtime package and no required ObservableObject base class — use it beside CommunityToolkit.Mvvm commands.
@@ -41,7 +41,11 @@ Features:
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>v2.2.0:
+    <PackageReleaseNotes>v2.2.1:
+• NOTIFY023 is Hidden so adding NotifyGen to a CommunityToolkit solution does not fail TreatWarningsAsErrors; the convert lightbulb still works
+• Public docs link the live GitHub Pages site
+
+v2.2.0:
 • [NotifyProperty] and CommunityToolkit [ObservableProperty] switch a [Notify] type to opt-in generation so unmarked underscore fields stay private
 • NOTIFY022 / NOTIFY023 convert CommunityToolkit property attributes with Fix All
 

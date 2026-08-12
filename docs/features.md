@@ -988,7 +988,7 @@ NotifyGen includes analyzers that catch mistakes at compile time:
 | NOTIFY020 | Warning | `[NotifyComputed]` is not a get-only instance property | — |
 | NOTIFY021 | Warning | `[NotifyComputed]` getter is outside the allow-list | — |
 | NOTIFY022 | Warning | `[Notify]` type still has CommunityToolkit `[ObservableProperty]` / `[NotifyPropertyChangedFor]` | Yes |
-| NOTIFY023 | Warning | CommunityToolkit property attributes without `[Notify]` | Yes |
+| NOTIFY023 | Hidden | CommunityToolkit property attributes without `[Notify]` | Yes |
 
 **NOTIFY001 and NOTIFY006 have a code fix** — click the lightbulb (or press `Ctrl+.` / `Cmd+.`) and select "Make type partial" to add the required modifier. **NOTIFY002** prefixes private instance fields with `_`. **NOTIFY003** replaces a nearby unknown `[NotifyAlso]` name. **NOTIFY022** / **NOTIFY023** convert CommunityToolkit `[ObservableProperty]` types to `[Notify]` + `[NotifyProperty]` without publishing unmarked `_logger` fields.
 

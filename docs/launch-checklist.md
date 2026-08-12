@@ -15,10 +15,11 @@
 
 ## Maintainer (admin UI)
 
-- [ ] Fix topic typo `source-genertator`
-- [ ] Enable Discussions + pin announcement
-- [ ] Enable Pages from `gh-pages`
-- [ ] Publish channel posts
+- [x] Fix topic typo `source-genertator`
+- [x] Enable Discussions
+- [x] Enable Pages from `gh-pages` (https://georgepwall1991.github.io/NotifyGen/)
+- [ ] Pin 2.2 Discussions announcement if the API pin failed
+- [ ] Publish channel posts (George only — drafts in launch-channels.md; **do not post** as an agent)
 
 ## Leading indicators (weekly)
 

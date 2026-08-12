@@ -39,11 +39,12 @@ if grep -q 'ReactiveUI' "$nuspec"; then
 fi
 
 grep -q 'PrivateAssets' "$readme"
-grep -q '2.2.0' "$readme"
+grep -q '2.2.1' "$readme"
 grep -q 'NotifyProperty' "$readme"
 grep -q 'NotifyComputed' "$readme"
-if grep -q 'georgepwall1991.github.io/NotifyGen' "$readme"; then
-  echo "README still advertises the unpublished Pages URL" >&2
+grep -q 'https://georgepwall1991.github.io/NotifyGen/' "$readme"
+if grep -q 'until Pages is enabled' "$readme"; then
+  echo "README still claims Pages is not live" >&2
   exit 1
 fi
 

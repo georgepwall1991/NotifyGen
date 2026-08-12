@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-08-12
+
+### Changed
+
+- **NOTIFY023** is Hidden so adding NotifyGen to a CommunityToolkit-only type does not fail `TreatWarningsAsErrors`. The convert lightbulb / Fix All still rewrites the type. **NOTIFY022** stays Warning (leftover `[ObservableProperty]` on a `[Notify]` type still dual-generates).
+- README and pack verify require the live docs site: https://georgepwall1991.github.io/NotifyGen/
+
 ## [2.2.0] - 2026-08-12
 
 ### Added

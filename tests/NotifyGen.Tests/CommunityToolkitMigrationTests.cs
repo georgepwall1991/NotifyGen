@@ -140,6 +140,28 @@ public class CommunityToolkitMigrationTests
     }
 
     [Fact]
+    public void DiagnosticDescriptors_Notify023_IsBelowWarning()
+    {
+        var descriptor = DiagnosticDescriptors.ConvertCommunityToolkitType;
+
+        descriptor.Id.Should().Be("NOTIFY023");
+        descriptor
+            .DefaultSeverity.Should()
+            .BeOneOf(DiagnosticSeverity.Hidden, DiagnosticSeverity.Info);
+        descriptor.IsEnabledByDefault.Should().BeTrue();
+    }
+
+    [Fact]
+    public void DiagnosticDescriptors_Notify022_StaysWarning()
+    {
+        var descriptor = DiagnosticDescriptors.ConvertCommunityToolkitOnNotifyType;
+
+        descriptor.Id.Should().Be("NOTIFY022");
+        descriptor.DefaultSeverity.Should().Be(DiagnosticSeverity.Warning);
+        descriptor.IsEnabledByDefault.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Analyzer_NotifyPlusObservableProperty_ReportsNotify022()
     {
         var source = WithCommunityToolkit(
@@ -160,7 +182,9 @@ public class CommunityToolkitMigrationTests
 
         var diagnostics = await GetDiagnosticsAsync(source);
 
-        diagnostics.Should().ContainSingle(d => d.Id == "NOTIFY022");
+        var notify022 = diagnostics.Should().ContainSingle(d => d.Id == "NOTIFY022").Subject;
+        notify022.Severity.Should().Be(DiagnosticSeverity.Warning);
+        notify022.DefaultSeverity.Should().Be(DiagnosticSeverity.Warning);
         diagnostics.Should().NotContain(d => d.Id == "NOTIFY005");
     }
 
@@ -183,7 +207,14 @@ public class CommunityToolkitMigrationTests
 
         var diagnostics = await GetDiagnosticsAsync(source);
 
-        diagnostics.Should().ContainSingle(d => d.Id == "NOTIFY023");
+        var notify023 = diagnostics.Should().ContainSingle(d => d.Id == "NOTIFY023").Subject;
+        notify023.Severity.Should().BeOneOf(DiagnosticSeverity.Hidden, DiagnosticSeverity.Info);
+        notify023
+            .DefaultSeverity.Should()
+            .BeOneOf(DiagnosticSeverity.Hidden, DiagnosticSeverity.Info);
+        diagnostics
+            .Should()
+            .NotContain(d => d.Id == "NOTIFY023" && d.Severity >= DiagnosticSeverity.Warning);
     }
 
     [Fact]

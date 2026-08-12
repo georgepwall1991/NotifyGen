@@ -14,6 +14,4 @@ docfx build docs/site/docfx.json
 
 Workflow: [`.github/workflows/docs.yml`](../../.github/workflows/docs.yml).
 
-Maintainer: enable **Settings → Pages → Source: GitHub Actions**, then merge to `master` (or run the workflow manually).
-
-Published URL (once Pages is on): https://georgepwall1991.github.io/NotifyGen/
+Live site (branch `gh-pages`): https://georgepwall1991.github.io/NotifyGen/
