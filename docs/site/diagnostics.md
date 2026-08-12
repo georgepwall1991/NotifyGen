@@ -24,7 +24,7 @@
 | **NOTIFY020** | Warning | `[NotifyComputed]` is not a get-only instance property | Use a non-static, non-indexer, get-only computed property |
 | **NOTIFY021** | Warning | `[NotifyComputed]` getter is outside the allow-list | Pass explicit `DependsOn` names (LINQ / helpers) |
 | **NOTIFY022** | Warning | `[Notify]` type still has CommunityToolkit `[ObservableProperty]` / `[NotifyPropertyChangedFor]` | Code-fix converts to `[NotifyProperty]` / `[NotifyComputed]` |
-| **NOTIFY023** | Warning | Type has CommunityToolkit property attributes and no `[Notify]` | Code-fix adds `[Notify]` + opt-in `[NotifyProperty]` and leaves unmarked `_fields` private |
+| **NOTIFY023** | Hidden | Type has CommunityToolkit property attributes and no `[Notify]` | Code-fix adds `[Notify]` + opt-in `[NotifyProperty]` and leaves unmarked `_fields` private. Hidden so installing NotifyGen does not fail TreatWarningsAsErrors on leftover CommunityToolkit types |
 
 ## Suppressions
 

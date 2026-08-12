@@ -43,26 +43,30 @@ public class DiscoverabilityMetadataTests
     }
 
     [Fact]
-    public void Package_Version_IsPatchAheadOfPublishedTwoOhOne()
+    public void Package_Version_IsPatchAheadOfPublishedTwoTwoOh()
     {
         var version = GetCsprojProperty("Version");
-        Version.Parse(version).Should().BeGreaterThanOrEqualTo(Version.Parse("2.1.0"));
+        Version.Parse(version).Should().BeGreaterThan(Version.Parse("2.2.0"));
+        GetCsprojProperty("PackageReleaseNotes").Should().Contain(version);
     }
 
     [Fact]
     public void Readme_IsConversionFunnel_WithAbsoluteHttpsLinks()
     {
         var readme = File.ReadAllText(Path.Combine(RepoRoot, "README.md"));
+        var version = GetCsprojProperty("Version");
 
         readme.Should().Contain("## Migrating from `[ObservableProperty]`?");
         readme.Should().Contain("## Quick start");
         readme.Should().Contain("PrivateAssets");
-        readme.Should().Contain("2.2.0");
+        readme.Should().Contain(version);
         readme.Should().Contain("NotifyComputed");
         readme.Should().Contain("NotifyProperty");
         readme.Should().Contain("NOTIFY023");
         readme.Should().Contain("NOTIFY001");
-        readme.Should().NotContain("georgepwall1991.github.io/NotifyGen");
+        readme.Should().Contain("https://georgepwall1991.github.io/NotifyGen/");
+        readme.Should().NotContain("until Pages is enabled");
+        readme.Should().NotMatchRegex("(?i)pages.{0,40}404");
 
         foreach (Match match in Regex.Matches(readme, @"!\[[^\]]*\]\(([^)]+)\)"))
         {
@@ -104,6 +108,19 @@ public class DiscoverabilityMetadataTests
         csproj.Should().Contain(@"assets\**\*");
         csproj.Should().Contain(@"Pack=""true""");
         csproj.Should().Contain(@"PackagePath=""assets\""");
+    }
+
+    [Fact]
+    public void LaunchChannels_ContainsPasteReady1175AndRedditCopy()
+    {
+        var channels = File.ReadAllText(Path.Combine(RepoRoot, "docs", "launch-channels.md"));
+
+        channels.Should().Contain("CommunityToolkit/dotnet#1175");
+        channels.Should().Contain("NotifyComputed");
+        channels.Should().Contain("NOTIFY023");
+        channels.Should().Contain("r/csharp");
+        channels.Should().Contain("https://georgepwall1991.github.io/NotifyGen/");
+        channels.Should().MatchRegex("(?i)do not post");
     }
 
     private static string GetCsprojProperty(string name)

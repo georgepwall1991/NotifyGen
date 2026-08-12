@@ -1,6 +1,35 @@
-# Channel copy for NotifyGen 2.0
+# Channel copy for NotifyGen 2.0 / 2.2
 
 Paste-ready posts. Prefer one high-signal post per venue; do not spam.
+**Do not post** these drafts as an agent — George posts in his own name.
+
+## CommunityToolkit/dotnet#1175 (do not post as George)
+
+Paste into https://github.com/CommunityToolkit/dotnet/discussions/1175 only from George's account.
+
+CommunityToolkit still has no `[ComputedProperty]`. NotifyGen 2.2 ships that shape and a one-ViewModel convert:
+
+- `[NotifyComputed]` / `[NotifyComputed(nameof(FirstName), nameof(LastName))]` — bounded getter walk or explicit DependsOn
+- Add `NotifyGen`, click the lightbulb on `[ObservableProperty]` (**NOTIFY023**, Hidden so `TreatWarningsAsErrors` stays green), Fix All. Unmarked `_logger` stays private. Keep `RelayCommand` on CommunityToolkit.
+
+Docs: https://georgepwall1991.github.io/NotifyGen/migrate.html  
+NuGet: https://www.nuget.org/packages/NotifyGen/  
+I am the NotifyGen maintainer. This is an offer to try the missing API, not a request to take a dependency in the Toolkit.
+
+## Reddit r/csharp (do not post as George)
+
+**Title:** NotifyGen 2.2 — `[NotifyComputed]` plus one-click convert from `[ObservableProperty]`
+
+NotifyGen is a narrow Roslyn source generator for `INotifyPropertyChanged`. One `[Notify]` on a partial class turns underscore fields into equality-guarded, inspectable properties — no runtime package, no required `ObservableObject`.
+
+2.2:
+
+- `[NotifyComputed]` for derived properties (the API CommunityToolkit/dotnet#1175 asked for)
+- Lightbulb / Fix All on `[ObservableProperty]` (**NOTIFY023**) converts one ViewModel. `_logger` stays private. Keep CommunityToolkit for `RelayCommand`.
+
+Docs: https://georgepwall1991.github.io/NotifyGen/  
+Migrate: https://georgepwall1991.github.io/NotifyGen/migrate.html  
+NuGet: https://www.nuget.org/packages/NotifyGen/
 
 ## Short (Reddit / Discord / Slack)
 
@@ -42,4 +71,4 @@ When answering INPC / `[ObservableProperty]` questions:
 2. Avalonia Discord (#showcase or #general)
 3. WPF / .NET community Slack or Discord you already participate in
 4. LinkedIn personal post with NuGet + GIF
-5. Pin GitHub Discussion announcement after Discussions is enabled
+5. Pin GitHub Discussion https://github.com/georgepwall1991/NotifyGen/discussions/22 (API cannot pin; UI-only)

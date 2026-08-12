@@ -301,8 +301,8 @@ internal static class DiagnosticDescriptors
         title: "Use NotifyGen for this CommunityToolkit type",
         messageFormat: "Type '{0}' uses CommunityToolkit [ObservableProperty] or [NotifyPropertyChangedFor]. Convert it to [Notify] with [NotifyProperty] so unmarked underscore fields stay private.",
         category: "NotifyGen",
-        defaultSeverity: DiagnosticSeverity.Warning,
+        defaultSeverity: DiagnosticSeverity.Hidden,
         isEnabledByDefault: true,
-        description: "NotifyGen can take over CommunityToolkit property generation one type at a time without publishing unmarked underscore fields."
+        description: "NotifyGen can take over CommunityToolkit property generation one type at a time without publishing unmarked underscore fields. Hidden so a one-ViewModel trial does not fail TreatWarningsAsErrors."
     );
 }

@@ -36,7 +36,7 @@ dotnet add package NotifyGen
 ```
 
 ```xml
-<PackageReference Include="NotifyGen" Version="2.2.0">
+<PackageReference Include="NotifyGen" Version="2.2.1">
   <PrivateAssets>all</PrivateAssets>
   <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
 </PackageReference>
@@ -91,8 +91,7 @@ partial void OnFirstNameChanged(string oldValue, string newValue);
 - [Samples](https://github.com/georgepwall1991/NotifyGen/blob/master/samples/README.md) — WPF, Avalonia, MAUI, Hybrid
 - [Changelog](https://github.com/georgepwall1991/NotifyGen/blob/master/CHANGELOG.md)
 - [2.0 launch post](https://github.com/georgepwall1991/NotifyGen/blob/master/docs/launch-post-2.0.md)
-
-The GitHub Pages site is generated from `docs/site/` once Pages is enabled from the `gh-pages` branch. Until then the documents above are the source of truth.
+- **Docs site:** [https://georgepwall1991.github.io/NotifyGen/](https://georgepwall1991.github.io/NotifyGen/) — before/after generated code, [CommunityToolkit migration](https://georgepwall1991.github.io/NotifyGen/migrate.html), and samples
 
 ## Requirements
 

@@ -25,11 +25,13 @@ Dropped as untruthful or stuffed: `ReactiveUI`, `android`, `ios`, `mac`, `linux`
 - [x] Launch announcement issue: https://github.com/georgepwall1991/NotifyGen/issues/17
 - [x] Stale remote branches deleted (only `master` remains)
 - [x] **2.0.2** honest tags/description, absolute README hrefs, packed `assets/`, discoverability tests, pack verify script
-- [x] Root README no longer advertises the Pages URL while it 404s
+- [x] **2.2.1** README + pack verify require the live Pages URL
+- [x] Topics typo `source-genertator` removed
+- [x] Discussions enabled
+- [x] Pages live: https://georgepwall1991.github.io/NotifyGen/
+- [x] 2.2 announcement discussion: https://github.com/georgepwall1991/NotifyGen/discussions/22 (pin is UI-only; GraphQL has no pinDiscussion)
 
-## Manual (requires repo admin — cloud agent token returns 403)
+## Manual (George's identity — do not post as an agent)
 
-1. **Topics** — remove typo `source-genertator`; keep `source-generators` / `source-generator` plus: `csharp`, `dotnet`, `mvvm`, `inotifypropertychanged`, `roslyn`, `wpf`, `maui`, `avalonia`, `blazor`, `nuget`, `code-generation`
-2. **Enable Discussions** — Settings → Features → Discussions; pin a copy of issue #17 as Announcement
-3. **Enable Pages** — Settings → Pages → Deploy from branch → **`gh-pages` / root** (after the Docs workflow has published once). Restore the Pages URL in the README only after `https://georgepwall1991.github.io/NotifyGen/` returns 200.
-4. Publish external posts from [launch-channels.md](launch-channels.md)
+1. Pin the 2.2 Discussions announcement if the API pin failed
+2. Publish external posts from [launch-channels.md](launch-channels.md) — **do not post** #1175 or Reddit as an agent
