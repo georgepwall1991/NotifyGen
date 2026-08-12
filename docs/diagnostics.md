@@ -3,8 +3,8 @@
 | Id | Severity | Meaning | Typical fix |
 |----|----------|---------|-------------|
 | **NOTIFY001** | Error | `[Notify]` type is not `partial` | Add `partial` |
-| **NOTIFY002** | Warning | No eligible underscore fields / incomplete partial properties | Add `_field` members or incomplete partial properties |
-| **NOTIFY003** | Warning | `[NotifyAlso]` names an unknown property | Fix the name or declare the dependent |
+| **NOTIFY002** | Warning | No eligible underscore fields / incomplete partial properties | Add `_field` members or incomplete partial properties; code fix prefixes private instance fields with `_` |
+| **NOTIFY003** | Warning | `[NotifyAlso]` names an unknown property | Fix the name or declare the dependent; code fix offers the closest known property when the typo is near |
 | **NOTIFY004** | Info | Static/const field cannot generate a property | Remove static/const or add `[NotifyIgnore]` |
 | **NOTIFY005** | Info | Readonly field cannot generate a setter | Remove `readonly` or add `[NotifyIgnore]` |
 | **NOTIFY006** | Error | Containing type of a nested `[Notify]` type is not partial | Make every container `partial` |
@@ -27,4 +27,4 @@
 | **NOTIFYSPR0001** | CS0657 | `[property: …]` on a field inside a `[Notify]` type |
 | **NOTIFYSPR0002** | CS0658 | `[get: …]` / `[set: …]` on a field inside a `[Notify]` type |
 
-Code fix: **NOTIFY001** / **NOTIFY006** offer **Make type partial**.
+Code fixes: **NOTIFY001** / **NOTIFY006** offer **Make type partial**. **NOTIFY002** prefixes private instance fields with `_`. **NOTIFY003** replaces a nearby unknown `[NotifyAlso]` name.

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-08-12
+
+### Added
+
+- Code fixes for **NOTIFY002** (prefix private instance fields with `_`) and **NOTIFY003** (replace an unknown `[NotifyAlso]` name with the closest known property)
+- Durable discoverability tests and `scripts/verify-packages.sh` pack gate
+
+### Changed
+
+- NuGet description leads with compile-time INPC, no runtime package, and no required `ObservableObject`
+- Package tags drop `ReactiveUI` and OS stuffing; keep truthful UI/MVVM/Roslyn terms
+- README links are absolute HTTPS so NuGet.org renders the migration funnel
+- README no longer advertises the GitHub Pages URL while Pages is disabled
+- Local `dotnet test` targets `net10.0` only; CI still runs net8.0/net9.0/net10.0
+
 ## [2.0.1] - 2026-08-11
 
 ### Added

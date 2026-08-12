@@ -38,7 +38,7 @@ dotnet add package NotifyGen
 Repo: https://github.com/georgepwall1991/NotifyGen  
 NuGet: https://www.nuget.org/packages/NotifyGen/  
 Samples: https://github.com/georgepwall1991/NotifyGen/tree/master/samples  
-Docs site: https://georgepwall1991.github.io/NotifyGen/
+Docs: https://github.com/georgepwall1991/NotifyGen/blob/master/docs/features.md
 
 ## Channel checklist
 

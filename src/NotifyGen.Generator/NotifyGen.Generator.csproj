@@ -12,10 +12,10 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>NotifyGen</PackageId>
-    <Version>2.0.1</Version>
+    <Version>2.0.2</Version>
     <Authors>George Wall</Authors>
     <Title>NotifyGen - INotifyPropertyChanged Source Generator</Title>
-    <Description>A fast INotifyPropertyChanged source generator for .NET. Eliminates MVVM boilerplate with a single [Notify] attribute, no runtime dependency, full IntelliSense, and debuggable generated code.
+    <Description>Compile-time INotifyPropertyChanged source generator for .NET. One [Notify] attribute generates equality-guarded properties with no runtime package and no required ObservableObject base class — use it beside CommunityToolkit.Mvvm commands.
 
 Features:
 • Auto-generates properties with PropertyChanged notifications
@@ -29,17 +29,22 @@ Features:
 • [NotifyCanExecuteChangedFor] for automatic command refresh
 • [NotifySuppressable] for batch notification suppression
 • Nested [Notify] class support with generic declaration preservation
-• Analyzer diagnostics and code fixes for invalid partial declarations
+• Analyzer diagnostics and code fixes for invalid partial declarations, underscore field names, and unknown NotifyAlso names
 • Works with WPF, MAUI, Blazor, Avalonia, Uno Platform, WinUI, and Xamarin
 • AOT compatible and trimming safe</Description>
-    <PackageTags>MVVM;INotifyPropertyChanged;INPC;WPF;MAUI;Blazor;Avalonia;Uno;Xamarin;WinUI;UWP;SourceGenerator;CodeGeneration;Roslyn;PropertyChanged;DataBinding;ViewModel;ReactiveUI;dotnet;csharp;boilerplate;code-generator;performance;aot;trimming;android;ios;mac;windows;linux</PackageTags>
+    <PackageTags>INotifyPropertyChanged;INPC;SourceGenerator;Roslyn;roslyn-analyzer;analyzers;MVVM;WPF;MAUI;Avalonia;WinUI;Blazor;Uno;PropertyChanged;DataBinding;ViewModel</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/georgepwall1991/NotifyGen</PackageProjectUrl>
     <RepositoryUrl>https://github.com/georgepwall1991/NotifyGen</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>v2.0.0:
+    <PackageReleaseNotes>v2.0.2:
+• Honest NuGet tags and description (zero-runtime INPC, no required base class, CommunityToolkit coexistence)
+• NuGet-safe absolute README links; pack demo/header assets
+• Code fixes for NOTIFY002 (prefix private fields with _) and NOTIFY003 (nearest NotifyAlso name)
+
+v2.0.0:
 • Forward [property:]/[get:]/[set:] field attributes onto generated properties and accessors
 • Suppress CS0657/CS0658 for accessor-target metadata on [Notify] fields (NOTIFYSPR0001/0002)
 • Adoption assets: Avalonia + CommunityToolkit hybrid samples, migration guide, diagnostics catalog
@@ -82,6 +87,7 @@ v1.9.0:
     <None Include="$(OutputPath)\NotifyGen.Attributes.dll" Pack="true" PackagePath="lib/netstandard2.0" Visible="false" />
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
     <None Include="..\..\assets\icon.png" Pack="true" PackagePath="\" />
+    <None Include="..\..\assets\**\*" Pack="true" PackagePath="assets\" />
   </ItemGroup>
 
 </Project>

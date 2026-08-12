@@ -1,4 +1,4 @@
-# NotifyGen 2.0 / 2.0.1 launch checklist
+# NotifyGen 2.0 / 2.0.2 launch checklist
 
 ## Shipped
 
@@ -11,6 +11,7 @@
 - [x] Docs site: `docs/site/` + Docs workflow → `gh-pages`
 - [x] NuGet + GitHub release **v2.0.1**
 - [x] Announcement: https://github.com/georgepwall1991/NotifyGen/issues/17
+- [x] 2.0.2 conversion patch: honest tags, absolute README links, NOTIFY002/003 code fixes (package not published until tagged)
 
 ## Maintainer (admin UI)
 
