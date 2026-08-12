@@ -9,18 +9,16 @@ namespace NotifyGen.HybridSample;
 [Notify]
 public partial class EditorViewModel
 {
-    [NotifyAlso(nameof(CanSave))]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     private string _title = "";
 
-    [NotifyAlso(nameof(CanSave))]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     private string _body = "";
 
     private string _status = "Edit a title and body, then Save.";
 
-    public bool CanSave =>
-        !string.IsNullOrWhiteSpace(Title) && !string.IsNullOrWhiteSpace(Body);
+    [NotifyComputed(nameof(Title), nameof(Body))]
+    public bool CanSave => !string.IsNullOrWhiteSpace(Title) && !string.IsNullOrWhiteSpace(Body);
 
     public IRelayCommand SaveCommand { get; }
 

@@ -10,6 +10,7 @@
 | CommunityToolkit coexistence | Description, README migration section |
 | WPF / MAUI / Avalonia / WinUI / Blazor | PackageTags, README hook |
 | NotifyAlso / dependent properties | README sample + highlights |
+| NotifyComputed / computed / derived properties | README quick start + highlights, package description |
 
 Dropped as untruthful or stuffed: `ReactiveUI`, `android`, `ios`, `mac`, `linux`.
 

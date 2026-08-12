@@ -359,6 +359,38 @@ if (EqualityComparer<string>.Default.Equals(_name, value)) return;
 
 NotifyGen automatically detects primitive types and uses direct `==` comparison for maximum performance. This prevents unnecessary `PropertyChanged` events and infinite loops from two-way bindings. Works correctly with nulls, value types, and reference types.
 
+### Computed properties with `[NotifyComputed]`
+
+Put the dependency on the derived property instead of repeating `[NotifyAlso]`
+on every source field. With no arguments, NotifyGen walks a bounded getter
+(this-property identifiers, eligible `_fields`, interpolation, and a closed
+expression set). Method calls and foreign members are rejected with **NOTIFY021**
+unless you pass explicit names:
+
+```csharp
+[Notify]
+public partial class Person
+{
+    private string _firstName;
+    private string _lastName;
+
+    [NotifyComputed]
+    public string FullName => $"{FirstName} {LastName}";
+
+    [NotifyComputed]
+    public string Greeting => $"Hello, {FullName}";
+
+    [NotifyComputed(nameof(FirstName), nameof(LastName))]
+    public string Initials => string.Concat(FirstName.AsSpan(0, 1), LastName.AsSpan(0, 1));
+}
+```
+
+Changing `FirstName` raises `FullName` and `Greeting`. Same-value equality
+guards still suppress the whole fan-out. `[NotifyAlso]` / `NotifyFrom` remain
+valid and merge into the same graph. See the
+[computed-property design](../design/notifycomputed.md) and
+[`NotifyComputedTests`](../../tests/NotifyGen.Tests/NotifyComputedTests.cs).
+
 ### Dependent Properties with `[NotifyAlso]`
 
 When one property affects another, use `[NotifyAlso]` to notify both:

@@ -2,7 +2,17 @@
 
 Date opened: 2026-08-11. NotifyGen `v2.0.0` has shipped cycles 1–5 plus adoption assets.
 
-## Gate — do not implement until signal exists
+## Selected for 2.1.0 — `[NotifyComputed]`
+
+User-requested one-feature override of the demand gate (2026-08-12).
+CommunityToolkit discussion [#1175](https://github.com/CommunityToolkit/dotnet/discussions/1175)
+proposed `[ComputedProperty]` and has not shipped it. NotifyGen 2.1 implements
+the opt-in form: explicit attribute, bounded getter walk or `DependsOn`, no
+unmarked-getter inference, no validation runtime.
+
+This is **not** the rejected “automatic getter inference” item below.
+
+## Gate — remaining candidates stay demand-gated
 
 Open this cycle for **implementation** only after ~2–4 weeks of post-launch signal from:
 

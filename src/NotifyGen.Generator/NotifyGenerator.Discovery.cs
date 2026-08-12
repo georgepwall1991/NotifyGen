@@ -48,8 +48,7 @@ public sealed partial class NotifyGenerator
             return null;
 
         if (
-            notifyAttribute.ApplicationSyntaxReference?.GetSyntax(ct)
-                is { } attributeSyntax
+            notifyAttribute.ApplicationSyntaxReference?.GetSyntax(ct) is { } attributeSyntax
             && (
                 attributeSyntax.SyntaxTree != classDeclaration.SyntaxTree
                 || !attributeSyntax
@@ -138,7 +137,7 @@ public sealed partial class NotifyGenerator
             implementChanging,
             isSuppressable,
             alwaysNotifyProperties,
-            ExtractFields(classSymbol, semanticModel.Compilation, ct),
+            ExtractFields(classSymbol, semanticModel, ct),
             classSymbol.GetMembers().Select(static member => member.Name).ToImmutableArray()
         );
     }
@@ -148,10 +147,11 @@ public sealed partial class NotifyGenerator
     /// </summary>
     private static ImmutableArray<FieldInfo> ExtractFields(
         INamedTypeSymbol classSymbol,
-        Compilation compilation,
+        SemanticModel semanticModel,
         CancellationToken ct
     )
     {
+        var compilation = semanticModel.Compilation;
         var members = ImmutableArray.CreateBuilder<FieldInfo>();
         foreach (var member in classSymbol.GetMembers())
         {
@@ -225,8 +225,8 @@ public sealed partial class NotifyGenerator
             {
                 IFieldSymbol field
                     when FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible
-                        && GeneratedPropertyNameValidation.IsValid(GetPropertyName(field))
-                    => GetPropertyName(field),
+                        && GeneratedPropertyNameValidation.IsValid(GetPropertyName(field)) =>
+                    GetPropertyName(field),
                 IPropertySymbol property => property.Name,
                 _ => null,
             };
@@ -249,11 +249,21 @@ public sealed partial class NotifyGenerator
             }
         }
 
+        var computedPhantoms = MergeComputedDependencies(
+            classSymbol,
+            semanticModel,
+            directTargets,
+            ct
+        );
+
         var mergedMembers = directMembers.ToDictionary(
             static member => member.PropertyName,
             member => member.WithAlsoNotify(directTargets[member.PropertyName].ToImmutable()),
             StringComparer.Ordinal
         );
+        foreach (var phantom in computedPhantoms)
+            mergedMembers[phantom.PropertyName] = phantom;
+
         var result = ImmutableArray.CreateBuilder<FieldInfo>(directMembers.Length);
         foreach (var member in directMembers)
         {
@@ -271,6 +281,206 @@ public sealed partial class NotifyGenerator
 
         return result.ToImmutable();
     }
+
+    private static ImmutableArray<FieldInfo> MergeComputedDependencies(
+        INamedTypeSymbol classSymbol,
+        SemanticModel semanticModel,
+        Dictionary<string, ImmutableArray<string>.Builder> directTargets,
+        CancellationToken ct
+    )
+    {
+        var fieldToProperty = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var field in classSymbol.GetMembers().OfType<IFieldSymbol>())
+        {
+            if (
+                FieldEligibilityClassifier.Classify(field) != FieldEligibility.Eligible
+                || !GeneratedPropertyNameValidation.IsValid(GetPropertyName(field))
+            )
+            {
+                continue;
+            }
+
+            fieldToProperty[field.Name] = GetPropertyName(field);
+        }
+
+        var computedAdjacency = new Dictionary<string, ImmutableArray<string>.Builder>(
+            StringComparer.Ordinal
+        );
+        var computedNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var property in classSymbol.GetMembers().OfType<IPropertySymbol>())
+        {
+            if (ComputedDependencyWalker.HasAttribute(property))
+                computedNames.Add(property.Name);
+        }
+
+        foreach (var property in classSymbol.GetMembers().OfType<IPropertySymbol>())
+        {
+            if (!computedNames.Contains(property.Name))
+                continue;
+
+            foreach (var attribute in GetNotifyAlsoAttributes(property))
+            {
+                if (RequestsNotifyFrom(attribute))
+                    continue;
+
+                if (
+                    RequestsSubPropertyNotification(attribute)
+                    || RequestsCollectionNotification(attribute)
+                )
+                {
+                    continue;
+                }
+
+                if (
+                    attribute.ConstructorArguments.FirstOrDefault().Value is not string targetName
+                    || string.IsNullOrEmpty(targetName)
+                    || !IsKnownAlsoNotifyTarget(
+                        classSymbol,
+                        directTargets,
+                        computedNames,
+                        targetName
+                    )
+                )
+                {
+                    continue;
+                }
+
+                if (!computedAdjacency.TryGetValue(property.Name, out var sourceSideTargets))
+                {
+                    sourceSideTargets = ImmutableArray.CreateBuilder<string>();
+                    computedAdjacency[property.Name] = sourceSideTargets;
+                }
+
+                sourceSideTargets.Add(targetName);
+            }
+        }
+
+        foreach (var member in classSymbol.GetMembers())
+        {
+            foreach (var attribute in GetNotifyAlsoAttributes(member))
+            {
+                if (!RequestsNotifyFrom(attribute))
+                    continue;
+
+                if (
+                    attribute.ConstructorArguments.FirstOrDefault().Value is not string sourceName
+                    || !computedNames.Contains(sourceName)
+                )
+                {
+                    continue;
+                }
+
+                var targetName = member switch
+                {
+                    IFieldSymbol field
+                        when FieldEligibilityClassifier.Classify(field)
+                            == FieldEligibility.Eligible => GetPropertyName(field),
+                    IPropertySymbol property => property.Name,
+                    _ => null,
+                };
+                if (string.IsNullOrEmpty(targetName))
+                    continue;
+
+                if (!computedAdjacency.TryGetValue(sourceName, out var notifyFromTargets))
+                {
+                    notifyFromTargets = ImmutableArray.CreateBuilder<string>();
+                    computedAdjacency[sourceName] = notifyFromTargets;
+                }
+
+                notifyFromTargets.Add(targetName!);
+            }
+        }
+
+        foreach (var property in classSymbol.GetMembers().OfType<IPropertySymbol>())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!ComputedDependencyWalker.HasAttribute(property))
+                continue;
+
+            var walk = ComputedDependencyWalker.Analyze(
+                property,
+                semanticModel,
+                classSymbol,
+                fieldToProperty,
+                candidate => IsIncompletePartialProperty(candidate, ct),
+                ct
+            );
+            if (
+                walk.Status
+                is ComputedWalkStatus.OnGeneratedMember
+                    or ComputedWalkStatus.Unsupported
+                    or ComputedWalkStatus.Empty
+                    or ComputedWalkStatus.WritableTarget
+            )
+            {
+                continue;
+            }
+
+            foreach (var sourceName in walk.Dependencies)
+            {
+                if (directTargets.TryGetValue(sourceName, out var generatedTargets))
+                {
+                    generatedTargets.Add(property.Name);
+                    continue;
+                }
+
+                if (!computedNames.Contains(sourceName))
+                    continue;
+
+                if (!computedAdjacency.TryGetValue(sourceName, out var computedTargets))
+                {
+                    computedTargets = ImmutableArray.CreateBuilder<string>();
+                    computedAdjacency[sourceName] = computedTargets;
+                }
+
+                computedTargets.Add(property.Name);
+            }
+        }
+
+        if (computedAdjacency.Count == 0)
+            return ImmutableArray<FieldInfo>.Empty;
+
+        var phantoms = ImmutableArray.CreateBuilder<FieldInfo>(computedAdjacency.Count);
+        foreach (var pair in computedAdjacency)
+        {
+            if (directTargets.ContainsKey(pair.Key))
+                continue;
+
+            phantoms.Add(CreateComputedTargetInfo(pair.Key, pair.Value.ToImmutable()));
+        }
+
+        return phantoms.ToImmutable();
+    }
+
+    private static bool IsKnownAlsoNotifyTarget(
+        INamedTypeSymbol classSymbol,
+        Dictionary<string, ImmutableArray<string>.Builder> generatedSources,
+        HashSet<string> computedNames,
+        string targetName
+    )
+    {
+        if (generatedSources.ContainsKey(targetName) || computedNames.Contains(targetName))
+            return true;
+
+        return classSymbol
+            .GetMembers()
+            .OfType<IPropertySymbol>()
+            .Any(property => property.Name == targetName);
+    }
+
+    private static FieldInfo CreateComputedTargetInfo(
+        string propertyName,
+        ImmutableArray<string> alsoNotify
+    ) =>
+        new(
+            fieldName: string.Empty,
+            propertyName: propertyName,
+            typeName: "object",
+            isNullable: false,
+            alsoNotify: alsoNotify,
+            commandsToNotify: ImmutableArray<string>.Empty,
+            isComputedTarget: true
+        );
 
     private static ImmutableArray<string> ExpandAlsoNotify(
         string sourcePropertyName,
@@ -400,7 +610,10 @@ public sealed partial class NotifyGenerator
             isPartialProperty: true,
             propertyAccessibility: GetAccessibilityText(property.DeclaredAccessibility),
             needsNullableBackingField: IsNonNullableReferenceType(property.Type),
-            getterAccess: GetAccessorAccessLevel(property.GetMethod, property.DeclaredAccessibility),
+            getterAccess: GetAccessorAccessLevel(
+                property.GetMethod,
+                property.DeclaredAccessibility
+            ),
             subPropertyNotify: GetSubPropertyNotifyTargets(property),
             collectionNotify: GetCollectionNotifyTargets(property),
             hasNonPartialTypedChangedHook: typedHook is not null,
@@ -463,10 +676,8 @@ public sealed partial class NotifyGenerator
         };
         if (
             memberType is null
-            || memberType is not ITypeParameterSymbol
-                && !memberType.IsReferenceType
-            || memberType is ITypeParameterSymbol parameter
-                && !parameter.HasReferenceTypeConstraint
+            || memberType is not ITypeParameterSymbol && !memberType.IsReferenceType
+            || memberType is ITypeParameterSymbol parameter && !parameter.HasReferenceTypeConstraint
         )
         {
             return ImmutableArray<string>.Empty;
@@ -480,8 +691,7 @@ public sealed partial class NotifyGenerator
             .Where(attribute => !RequestsNotifyFrom(attribute))
             .Where(attribute =>
                 attribute.NamedArguments.Any(named =>
-                    named.Key == "NotifyOnSubPropertyChanged"
-                    && named.Value.Value is true
+                    named.Key == "NotifyOnSubPropertyChanged" && named.Value.Value is true
                 )
             )
             .Select(attribute => attribute.ConstructorArguments.FirstOrDefault().Value as string)
@@ -495,9 +705,11 @@ public sealed partial class NotifyGenerator
     {
         return GetNotifyAlsoAttributes(member)
             .Where(attribute => !RequestsNotifyFrom(attribute))
-            .Where(attribute => attribute.NamedArguments.Any(named =>
-                named.Key == "NotifyOnCollectionChanged" && named.Value.Value is true
-            ))
+            .Where(attribute =>
+                attribute.NamedArguments.Any(named =>
+                    named.Key == "NotifyOnCollectionChanged" && named.Value.Value is true
+                )
+            )
             .Select(attribute => attribute.ConstructorArguments.FirstOrDefault().Value as string)
             .Where(static value => !string.IsNullOrEmpty(value))
             .Cast<string>()
@@ -527,13 +739,20 @@ public sealed partial class NotifyGenerator
             named.Key == "NotifyFrom" && named.Value.Value is true
         );
 
+    private static bool RequestsSubPropertyNotification(AttributeData attribute) =>
+        attribute.NamedArguments.Any(named =>
+            named.Key == "NotifyOnSubPropertyChanged" && named.Value.Value is true
+        );
+
+    private static bool RequestsCollectionNotification(AttributeData attribute) =>
+        attribute.NamedArguments.Any(named =>
+            named.Key == "NotifyOnCollectionChanged" && named.Value.Value is true
+        );
+
     /// <summary>
     /// Extracts string values from multiple instances of an attribute.
     /// </summary>
-    private static ImmutableArray<string> GetAttributeValues(
-        ISymbol member,
-        string attributeName
-    )
+    private static ImmutableArray<string> GetAttributeValues(ISymbol member, string attributeName)
     {
         return member
             .GetAttributes()
@@ -636,5 +855,4 @@ public sealed partial class NotifyGenerator
                 _ => false,
             };
     }
-
 }

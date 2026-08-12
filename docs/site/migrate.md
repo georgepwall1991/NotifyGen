@@ -9,7 +9,7 @@ NotifyGen is a **narrow INPC source generator**. Keep CommunityToolkit.Mvvm for 
 3. **Pick one ViewModel** — migrate a single type first (not the whole solution).
 4. **Mark the class** — add `[Notify]` and ensure the type is `partial`.
 5. **Drop `[ObservableProperty]`** — leave underscore fields; NotifyGen generates the properties.
-6. **Map dependents** — `[NotifyPropertyChangedFor]` → `[NotifyAlso]`.
+6. **Map dependents** — prefer `[NotifyComputed]` on the derived property; `[NotifyPropertyChangedFor]` can also become `[NotifyAlso]` on each source.
 7. **Map commands** — keep `[NotifyCanExecuteChangedFor]` (same name) pointing at CT `IRelayCommand` properties.
 8. **Base class** — `ObservableObject` is optional. Prefer your own INPC host; NotifyGen reuses accessible `OnPropertyChanged`.
 9. **Leave out of scope on CT** — messenger recipients, validation/INDEI, navigation.
@@ -29,7 +29,8 @@ Blocked on: ________
 |------------------|-----------|
 | `[ObservableProperty]` on a field | `[Notify]` on the **class** + underscore field (`_name` → `Name`) |
 | C# partial properties with CT | C# 14 incomplete partial properties under `[Notify]` |
-| `[NotifyPropertyChangedFor(nameof(X))]` | `[NotifyAlso(nameof(X))]` |
+| `[NotifyPropertyChangedFor(nameof(X))]` | `[NotifyComputed]` on `X`, or `[NotifyAlso(nameof(X))]` on each source |
+| Proposed `[ComputedProperty]` (CT #1175) | `[NotifyComputed]` / `[NotifyComputed(nameof(...))]` |
 | Target-side depends-on (CT PR style) | `[NotifyAlso(nameof(Source), NotifyFrom = true)]` on the dependent |
 | Child object refresh | `[NotifyAlso(nameof(X), NotifyOnSubPropertyChanged = true)]` |
 | Collection membership refresh | `[NotifyAlso(nameof(X), NotifyOnCollectionChanged = true)]` |

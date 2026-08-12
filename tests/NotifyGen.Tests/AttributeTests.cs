@@ -1,3 +1,4 @@
+using System.Reflection;
 using FluentAssertions;
 
 namespace NotifyGen.Tests;
@@ -36,8 +37,7 @@ public class AttributeTests
         var action = () => new NotifyAlsoAttribute(null!);
 
         // Assert
-        action.Should().Throw<ArgumentNullException>()
-            .WithParameterName("propertyName");
+        action.Should().Throw<ArgumentNullException>().WithParameterName("propertyName");
     }
 
     [Fact]
@@ -48,6 +48,67 @@ public class AttributeTests
 
         // Assert
         attribute.PropertyName.Should().BeEmpty();
+    }
+
+    #endregion
+
+    #region NotifyComputedAttribute Tests
+
+    [Fact]
+    public void NotifyComputedAttribute_ExistsOnAttributesAssembly()
+    {
+        GetNotifyComputedAttributeType().Should().NotBeNull();
+    }
+
+    [Fact]
+    public void NotifyComputedAttribute_Parameterless_HasEmptyDependsOn()
+    {
+        var type = GetNotifyComputedAttributeType();
+        type.Should().NotBeNull();
+
+        var instance = Activator.CreateInstance(type!);
+        var dependsOn = GetDependsOn(type!, instance!);
+
+        dependsOn.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void NotifyComputedAttribute_ParamsCtor_StoresDependsOn()
+    {
+        var type = GetNotifyComputedAttributeType();
+        type.Should().NotBeNull();
+
+        var instance = Activator.CreateInstance(
+            type!,
+            new object[] { new[] { "FirstName", "LastName" } }
+        );
+        var dependsOn = GetDependsOn(type!, instance!);
+
+        dependsOn.Should().Equal("FirstName", "LastName");
+    }
+
+    [Fact]
+    public void NotifyComputedAttribute_NullDependsOn_ThrowsArgumentNullException()
+    {
+        var type = GetNotifyComputedAttributeType();
+        type.Should().NotBeNull();
+
+        var constructor = type!.GetConstructor(new[] { typeof(string[]) });
+        constructor.Should().NotBeNull();
+
+        var act = () => constructor!.Invoke(new object?[] { null });
+
+        act.Should().Throw<TargetInvocationException>().WithInnerException<ArgumentNullException>();
+    }
+
+    private static Type? GetNotifyComputedAttributeType() =>
+        typeof(NotifyAttribute).Assembly.GetType("NotifyGen.NotifyComputedAttribute");
+
+    private static IReadOnlyList<string> GetDependsOn(Type type, object instance)
+    {
+        var property = type.GetProperty("DependsOn");
+        property.Should().NotBeNull();
+        return (IReadOnlyList<string>)property!.GetValue(instance)!;
     }
 
     #endregion
@@ -71,7 +132,9 @@ public class AttributeTests
         var action = () => new NotifyNameAttribute(null!);
 
         // Assert
-        action.Should().Throw<ArgumentException>()
+        action
+            .Should()
+            .Throw<ArgumentException>()
             .WithParameterName("name")
             .WithMessage("*cannot be null or empty*");
     }
@@ -83,7 +146,9 @@ public class AttributeTests
         var action = () => new NotifyNameAttribute("");
 
         // Assert
-        action.Should().Throw<ArgumentException>()
+        action
+            .Should()
+            .Throw<ArgumentException>()
             .WithParameterName("name")
             .WithMessage("*cannot be null or empty*");
     }
@@ -119,7 +184,9 @@ public class AttributeTests
     [InlineData(AccessLevel.Private)]
     [InlineData(AccessLevel.ProtectedInternal)]
     [InlineData(AccessLevel.PrivateProtected)]
-    public void NotifySetterAttribute_Constructor_WithAllAccessLevels_SetsCorrectly(AccessLevel level)
+    public void NotifySetterAttribute_Constructor_WithAllAccessLevels_SetsCorrectly(
+        AccessLevel level
+    )
     {
         // Arrange & Act
         var attribute = new NotifySetterAttribute(level);

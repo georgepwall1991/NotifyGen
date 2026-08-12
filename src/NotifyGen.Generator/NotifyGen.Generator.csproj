@@ -12,7 +12,7 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>NotifyGen</PackageId>
-    <Version>2.0.2</Version>
+    <Version>2.1.0</Version>
     <Authors>George Wall</Authors>
     <Title>NotifyGen - INotifyPropertyChanged Source Generator</Title>
     <Description>Compile-time INotifyPropertyChanged source generator for .NET. One [Notify] attribute generates equality-guarded properties with no runtime package and no required ObservableObject base class — use it beside CommunityToolkit.Mvvm commands.
@@ -21,6 +21,7 @@ Features:
 • Auto-generates properties with PropertyChanged notifications
 • Built-in equality guards prevent redundant events
 • Partial hooks: On{Property}Changing(oldValue, newValue) and On{Property}Changed()
+• [NotifyComputed] for derived properties (bounded getter walk or explicit DependsOn)
 • [NotifyAlso] for dependent properties, child changes, and collection membership
 • Reuse existing INPC host invokers without duplicate events or runtime dependencies
 • Forward [property:]/[get:]/[set:] field attributes onto generated members
@@ -39,7 +40,11 @@ Features:
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>v2.0.2:
+    <PackageReleaseNotes>v2.1.0:
+• [NotifyComputed] wires derived properties from the getter or an explicit DependsOn list
+• NOTIFY018 / NOTIFY019 / NOTIFY021 for empty, generated-member, and unsupported computed getters
+
+v2.0.2:
 • Honest NuGet tags and description (zero-runtime INPC, no required base class, CommunityToolkit coexistence)
 • NuGet-safe absolute README links; pack demo/header assets
 • Code fixes for NOTIFY002 (prefix private fields with _) and NOTIFY003 (nearest NotifyAlso name)

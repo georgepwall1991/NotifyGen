@@ -30,6 +30,7 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
     public ImmutableArray<string> PropertyAttributes { get; }
     public ImmutableArray<string> GetterAttributes { get; }
     public ImmutableArray<string> SetterAttributes { get; }
+    public bool IsComputedTarget { get; }
 
     public FieldInfo(
         string fieldName,
@@ -52,7 +53,8 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         ImmutableArray<string> collectionNotify = default,
         bool hasNonPartialTypedChangedHook = false,
         string? existingTypedChangedHookParameterTypeName = null,
-        string? existingTypedChangedHookNewParameterTypeName = null
+        string? existingTypedChangedHookNewParameterTypeName = null,
+        bool isComputedTarget = false
     )
     {
         FieldName = fieldName;
@@ -86,6 +88,7 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
         CollectionNotify = collectionNotify.IsDefault
             ? ImmutableArray<string>.Empty
             : collectionNotify;
+        IsComputedTarget = isComputedTarget;
     }
 
     public FieldInfo WithAlsoNotify(ImmutableArray<string> alsoNotify) =>
@@ -110,7 +113,8 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             CollectionNotify,
             HasNonPartialTypedChangedHook,
             ExistingTypedChangedHookParameterTypeName,
-            ExistingTypedChangedHookNewParameterTypeName
+            ExistingTypedChangedHookNewParameterTypeName,
+            IsComputedTarget
         );
 
     public bool Equals(FieldInfo other)
@@ -127,15 +131,18 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
             && NeedsNullableBackingField == other.NeedsNullableBackingField
             && GetterAccess == other.GetterAccess
             && HasNonPartialTypedChangedHook == other.HasNonPartialTypedChangedHook
-            && ExistingTypedChangedHookParameterTypeName == other.ExistingTypedChangedHookParameterTypeName
-            && ExistingTypedChangedHookNewParameterTypeName == other.ExistingTypedChangedHookNewParameterTypeName
+            && ExistingTypedChangedHookParameterTypeName
+                == other.ExistingTypedChangedHookParameterTypeName
+            && ExistingTypedChangedHookNewParameterTypeName
+                == other.ExistingTypedChangedHookNewParameterTypeName
             && PropertyAttributes.SequenceEqual(other.PropertyAttributes)
             && GetterAttributes.SequenceEqual(other.GetterAttributes)
             && SetterAttributes.SequenceEqual(other.SetterAttributes)
             && SubPropertyNotify.SequenceEqual(other.SubPropertyNotify)
             && CollectionNotify.SequenceEqual(other.CollectionNotify)
             && AlsoNotify.SequenceEqual(other.AlsoNotify)
-            && CommandsToNotify.SequenceEqual(other.CommandsToNotify);
+            && CommandsToNotify.SequenceEqual(other.CommandsToNotify)
+            && IsComputedTarget == other.IsComputedTarget;
     }
 
     public override bool Equals(object? obj) => obj is FieldInfo other && Equals(other);
@@ -173,6 +180,7 @@ internal readonly struct FieldInfo : IEquatable<FieldInfo>
                 hash = hash * 31 + (propertyName?.GetHashCode() ?? 0);
             foreach (var commandName in CommandsToNotify)
                 hash = hash * 31 + (commandName?.GetHashCode() ?? 0);
+            hash = hash * 31 + IsComputedTarget.GetHashCode();
 
             return hash;
         }

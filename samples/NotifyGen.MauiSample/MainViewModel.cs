@@ -10,10 +10,8 @@ namespace NotifyGen.MauiSample;
 [NotifySuppressable]
 public partial class MainViewModel : ViewModelBase
 {
-    [NotifyAlso(nameof(FullName))]
     private string _firstName = "Ada";
 
-    [NotifyAlso(nameof(FullName))]
     private string _lastName = "Lovelace";
 
     [NotifyAlso(nameof(LocationSummary), NotifyOnSubPropertyChanged = true)]
@@ -24,6 +22,7 @@ public partial class MainViewModel : ViewModelBase
 
     private string _status = "Ready";
 
+    [NotifyComputed]
     public string FullName => $"{FirstName} {LastName}";
 
     public string LocationSummary =>

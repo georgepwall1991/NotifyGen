@@ -8,18 +8,12 @@ namespace NotifyGen.ConsoleSample;
 [Notify]
 public partial class PersonViewModel
 {
-    // Basic property - just declare the field with underscore prefix
-    // Note: Intentionally NOT using [NotifyAlso("FullName")] here to demonstrate
-    // that you must explicitly declare dependencies. Compare with _lastName below.
+    // Basic property - just declare the field with underscore prefix.
+    // FullName is wired from [NotifyComputed] on the derived property.
     private string _firstName = "";
 
-    // [NotifyAlso] - notify dependent properties when this changes
-    [NotifyAlso("FullName")]
-    [NotifyAlso("CanSave")]
     private string _lastName = "";
 
-    // Multiple [NotifyAlso] on same field
-    [NotifyAlso("FullName")]
     private string _middleName = "";
 
     // Simple numeric property
@@ -42,13 +36,16 @@ public partial class PersonViewModel
 
     /// <summary>
     /// Computed property that depends on FirstName, MiddleName, and LastName.
+    /// LINQ is outside the getter allow-list, so DependsOn is explicit.
     /// </summary>
+    [NotifyComputed(nameof(FirstName), nameof(MiddleName), nameof(LastName))]
     public string FullName
     {
         get
         {
-            var parts = new[] { FirstName, MiddleName, LastName }
-                .Where(s => !string.IsNullOrWhiteSpace(s));
+            var parts = new[] { FirstName, MiddleName, LastName }.Where(s =>
+                !string.IsNullOrWhiteSpace(s)
+            );
             return string.Join(" ", parts);
         }
     }
@@ -56,8 +53,9 @@ public partial class PersonViewModel
     /// <summary>
     /// Validation property - can only save if required fields are filled.
     /// </summary>
-    public bool CanSave => !string.IsNullOrWhiteSpace(FirstName)
-                        && !string.IsNullOrWhiteSpace(LastName);
+    [NotifyComputed(nameof(FirstName), nameof(LastName))]
+    public bool CanSave =>
+        !string.IsNullOrWhiteSpace(FirstName) && !string.IsNullOrWhiteSpace(LastName);
 
     /// <summary>
     /// Gets the change log for debugging.
