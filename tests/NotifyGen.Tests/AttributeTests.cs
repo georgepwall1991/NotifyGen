@@ -8,6 +8,14 @@ namespace NotifyGen.Tests;
 /// </summary>
 public class AttributeTests
 {
+    [Fact]
+    public void NotifyPropertyAttribute_CanBeConstructed()
+    {
+        var attribute = new NotifyPropertyAttribute();
+
+        attribute.Should().NotBeNull();
+    }
+
     #region NotifyAlsoAttribute Tests
 
     [Fact]

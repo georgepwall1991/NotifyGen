@@ -17,7 +17,6 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
 {
     private const string NotifyAttributeName = "NotifyGen.NotifyAttribute";
     private const string NotifyAlsoAttributeName = "NotifyGen.NotifyAlsoAttribute";
-    private const string NotifyNameAttributeName = "NotifyGen.NotifyNameAttribute";
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         ImmutableArray.Create(
@@ -41,7 +40,9 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.NotifyComputedEmptyDependencies,
             DiagnosticDescriptors.NotifyComputedOnGeneratedMember,
             DiagnosticDescriptors.NotifyComputedRequiresGetOnlyProperty,
-            DiagnosticDescriptors.NotifyComputedUnsupportedGetter
+            DiagnosticDescriptors.NotifyComputedUnsupportedGetter,
+            DiagnosticDescriptors.ConvertCommunityToolkitOnNotifyType,
+            DiagnosticDescriptors.ConvertCommunityToolkitType
         );
 
     public override void Initialize(AnalysisContext context)
@@ -65,24 +66,36 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         var notifyAttribute = classSymbol
             .GetAttributes()
             .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifyAttributeName);
-
-        if (notifyAttribute == null)
-            return;
-
-        if (
-            notifyAttribute.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken)
+        var notifyOnThisDeclaration =
+            notifyAttribute?.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken)
                 is { } attributeSyntax
-            && (
-                attributeSyntax.SyntaxTree != classDeclaration.SyntaxTree
-                || !attributeSyntax
-                    .AncestorsAndSelf()
-                    .OfType<ClassDeclarationSyntax>()
-                    .Any(declaration => declaration.Span == classDeclaration.Span)
-            )
-        )
+            && attributeSyntax.SyntaxTree == classDeclaration.SyntaxTree
+            && attributeSyntax
+                .AncestorsAndSelf()
+                .OfType<ClassDeclarationSyntax>()
+                .Any(declaration => declaration.Span == classDeclaration.Span);
+        var communityToolkitOnThisDeclaration =
+            NotifyMemberSelection.DeclarationHasCommunityToolkitPropertyAttributes(
+                classDeclaration,
+                context.SemanticModel,
+                context.CancellationToken
+            );
+
+        if (communityToolkitOnThisDeclaration)
         {
-            return;
+            context.ReportDiagnostic(
+                Diagnostic.Create(
+                    notifyAttribute == null
+                        ? DiagnosticDescriptors.ConvertCommunityToolkitType
+                        : DiagnosticDescriptors.ConvertCommunityToolkitOnNotifyType,
+                    classDeclaration.Identifier.GetLocation(),
+                    classSymbol.Name
+                )
+            );
         }
+
+        if (!notifyOnThisDeclaration || notifyAttribute is null)
+            return;
 
         if (classDeclaration.Modifiers.Any(SyntaxKind.FileKeyword))
         {
@@ -224,32 +237,35 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         ClassDeclarationSyntax classDeclaration
     )
     {
+        var optIn = NotifyMemberSelection.TypeUsesOptIn(classSymbol, context.CancellationToken);
         var hasEligibleMembers = false;
 
         foreach (var field in classSymbol.GetMembers().OfType<IFieldSymbol>())
         {
+            if (optIn && !NotifyMemberSelection.HasOptInMarker(field))
+                continue;
+
+            if (NotifyMemberSelection.ShouldGenerateField(field, optIn))
+            {
+                hasEligibleMembers = true;
+                var propertyName = GetPropertyName(field);
+                if (!GeneratedPropertyNameValidation.IsValid(propertyName))
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.InvalidGeneratedPropertyName,
+                            GetSymbolLocation(field, classDeclaration, context.CancellationToken),
+                            field.Name,
+                            propertyName
+                        )
+                    );
+                }
+                continue;
+            }
+
             var eligibility = FieldEligibilityClassifier.Classify(field);
             switch (eligibility)
             {
-                case FieldEligibility.Eligible:
-                    hasEligibleMembers = true;
-                    var propertyName = GetPropertyName(field);
-                    if (!GeneratedPropertyNameValidation.IsValid(propertyName))
-                    {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
-                                DiagnosticDescriptors.InvalidGeneratedPropertyName,
-                                GetSymbolLocation(
-                                    field,
-                                    classDeclaration,
-                                    context.CancellationToken
-                                ),
-                                field.Name,
-                                propertyName
-                            )
-                        );
-                    }
-                    break;
                 case FieldEligibility.StaticOrConst:
                     context.ReportDiagnostic(
                         Diagnostic.Create(
@@ -275,7 +291,13 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             classSymbol
                 .GetMembers()
                 .OfType<IPropertySymbol>()
-                .Any(property => IsIncompletePartialProperty(property, context.CancellationToken))
+                .Any(property =>
+                    NotifyMemberSelection.ShouldGeneratePartial(
+                        property,
+                        optIn,
+                        context.CancellationToken
+                    )
+                )
         )
         {
             hasEligibleMembers = true;
@@ -299,17 +321,20 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         ClassDeclarationSyntax classDeclaration
     )
     {
+        var optIn = NotifyMemberSelection.TypeUsesOptIn(classSymbol, context.CancellationToken);
         var generatedNames = new Dictionary<string, ISymbol>();
         foreach (var member in classSymbol.GetMembers())
         {
             var propertyName = member switch
             {
-                IFieldSymbol field
-                    when FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible =>
+                IFieldSymbol field when NotifyMemberSelection.ShouldGenerateField(field, optIn) =>
                     GetPropertyName(field),
                 IPropertySymbol property
-                    when IsIncompletePartialProperty(property, context.CancellationToken) =>
-                    property.Name,
+                    when NotifyMemberSelection.ShouldGeneratePartial(
+                        property,
+                        optIn,
+                        context.CancellationToken
+                    ) => property.Name,
                 _ => null,
             };
 
@@ -335,8 +360,11 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
         foreach (var property in classSymbol.GetMembers().OfType<IPropertySymbol>())
         {
             if (
-                IsIncompletePartialProperty(property, context.CancellationToken)
-                || !generatedNames.ContainsKey(property.Name)
+                NotifyMemberSelection.ShouldGeneratePartial(
+                    property,
+                    optIn,
+                    context.CancellationToken
+                ) || !generatedNames.ContainsKey(property.Name)
             )
             {
                 continue;
@@ -363,10 +391,11 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             .Select(p => p.Name)
             .ToImmutableHashSet();
 
+        var optIn = NotifyMemberSelection.TypeUsesOptIn(classSymbol, context.CancellationToken);
         var generatedMembers = new Dictionary<string, ISymbol>();
         foreach (var field in classSymbol.GetMembers().OfType<IFieldSymbol>())
         {
-            if (FieldEligibilityClassifier.Classify(field) != FieldEligibility.Eligible)
+            if (!NotifyMemberSelection.ShouldGenerateField(field, optIn))
                 continue;
 
             var propertyName = GetPropertyName(field);
@@ -376,7 +405,13 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
 
         foreach (var property in classSymbol.GetMembers().OfType<IPropertySymbol>())
         {
-            if (IsIncompletePartialProperty(property, context.CancellationToken))
+            if (
+                NotifyMemberSelection.ShouldGeneratePartial(
+                    property,
+                    optIn,
+                    context.CancellationToken
+                )
+            )
                 generatedMembers[property.Name] = property;
         }
 
@@ -569,10 +604,11 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
     )
     {
         var fieldToProperty = new Dictionary<string, string>(StringComparer.Ordinal);
+        var optIn = NotifyMemberSelection.TypeUsesOptIn(classSymbol, context.CancellationToken);
         foreach (var field in classSymbol.GetMembers().OfType<IFieldSymbol>())
         {
             if (
-                FieldEligibilityClassifier.Classify(field) != FieldEligibility.Eligible
+                !NotifyMemberSelection.ShouldGenerateField(field, optIn)
                 || !GeneratedPropertyNameValidation.IsValid(GetPropertyName(field))
             )
             {
@@ -599,7 +635,12 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
                 context.SemanticModel,
                 classSymbol,
                 fieldToProperty,
-                candidate => IsIncompletePartialProperty(candidate, context.CancellationToken),
+                candidate =>
+                    NotifyMemberSelection.ShouldGeneratePartial(
+                        candidate,
+                        NotifyMemberSelection.TypeUsesOptIn(classSymbol, context.CancellationToken),
+                        context.CancellationToken
+                    ),
                 context.CancellationToken
             );
             var location = GetAttributeLocation(
@@ -770,22 +811,8 @@ public sealed class NotifyAnalyzer : DiagnosticAnalyzer
             _ => member.Name,
         };
 
-    private static string GetPropertyName(IFieldSymbol field)
-    {
-        var notifyNameAttr = field
-            .GetAttributes()
-            .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifyNameAttributeName);
-
-        if (notifyNameAttr?.ConstructorArguments.FirstOrDefault().Value is string customName)
-            return customName;
-
-        return char.ToUpperInvariant(field.Name[1]) + field.Name.Substring(2);
-    }
-
-    private static bool IsIncompletePartialProperty(
-        IPropertySymbol property,
-        System.Threading.CancellationToken ct
-    ) => PartialPropertyEligibility.IsSupported(property, ct);
+    private static string GetPropertyName(IFieldSymbol field) =>
+        NotifyMemberSelection.GetGeneratedPropertyName(field);
 
     private static void ReportDependencyCycle(
         SyntaxNodeAnalysisContext context,

@@ -25,6 +25,8 @@ Zero runtime reflection. No IL weaving. No required base class. Inspectable gene
 
 Keep **CommunityToolkit.Mvvm** for `RelayCommand` / messaging. Use **NotifyGen** for properties — no required `ObservableObject`, zero runtime package.
 
+Add NotifyGen, click the lightbulb on `[ObservableProperty]` (**NOTIFY023**), and Fix All. Unmarked `_logger` / `_disposed` fields stay private.
+
 → **[Migration checklist & attribute map](https://github.com/georgepwall1991/NotifyGen/blob/master/docs/migrate-from-communitytoolkit.md)** · [Hybrid UI sample](https://github.com/georgepwall1991/NotifyGen/tree/master/samples/NotifyGen.HybridSample)
 
 ## Quick start
@@ -34,7 +36,7 @@ dotnet add package NotifyGen
 ```
 
 ```xml
-<PackageReference Include="NotifyGen" Version="2.1.0">
+<PackageReference Include="NotifyGen" Version="2.2.0">
   <PrivateAssets>all</PrivateAssets>
   <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
 </PackageReference>
@@ -78,7 +80,8 @@ partial void OnFirstNameChanged(string oldValue, string newValue);
 - `[NotifyAlso]` with transitive closure, target-side `NotifyFrom`, child INPC, and collection membership
 - Typed `On{Property}Changed(old, new)` hooks, changing events, suppressable bulk updates
 - Property / `property:` / `get:` / `set:` metadata forwarding
-- Analyzer diagnostics **NOTIFY001–NOTIFY021**; code fixes for missing `partial` (**NOTIFY001** / **NOTIFY006**), underscore field names (**NOTIFY002**), and unknown `[NotifyAlso]` names (**NOTIFY003**)
+- `[NotifyProperty]` opt-in (and CommunityToolkit `[ObservableProperty]` takeover) so mixed ViewModels do not publish `_logger`
+- Analyzer diagnostics **NOTIFY001–NOTIFY023**; code fixes for missing `partial` (**NOTIFY001** / **NOTIFY006**), underscore field names (**NOTIFY002**), unknown `[NotifyAlso]` names (**NOTIFY003**), and CommunityToolkit conversion (**NOTIFY022** / **NOTIFY023**)
 
 ## Docs
 

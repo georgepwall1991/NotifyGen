@@ -57,8 +57,10 @@ public class DiscoverabilityMetadataTests
         readme.Should().Contain("## Migrating from `[ObservableProperty]`?");
         readme.Should().Contain("## Quick start");
         readme.Should().Contain("PrivateAssets");
-        readme.Should().Contain("2.1.0");
+        readme.Should().Contain("2.2.0");
         readme.Should().Contain("NotifyComputed");
+        readme.Should().Contain("NotifyProperty");
+        readme.Should().Contain("NOTIFY023");
         readme.Should().Contain("NOTIFY001");
         readme.Should().NotContain("georgepwall1991.github.io/NotifyGen");
 

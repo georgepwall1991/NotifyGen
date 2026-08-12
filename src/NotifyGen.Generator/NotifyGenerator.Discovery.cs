@@ -152,13 +152,14 @@ public sealed partial class NotifyGenerator
     )
     {
         var compilation = semanticModel.Compilation;
+        var optIn = NotifyMemberSelection.TypeUsesOptIn(classSymbol, ct);
         var members = ImmutableArray.CreateBuilder<FieldInfo>();
         foreach (var member in classSymbol.GetMembers())
         {
             ct.ThrowIfCancellationRequested();
             if (
                 member is IFieldSymbol field
-                && FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible
+                && NotifyMemberSelection.ShouldGenerateField(field, optIn)
             )
             {
                 if (
@@ -169,7 +170,7 @@ public sealed partial class NotifyGenerator
             }
             else if (
                 member is IPropertySymbol property
-                && IsIncompletePartialProperty(property, ct)
+                && NotifyMemberSelection.ShouldGeneratePartial(property, optIn, ct)
                 && !IsFileLocalType(property.Type, ct)
             )
             {
@@ -185,7 +186,9 @@ public sealed partial class NotifyGenerator
             || classSymbol
                 .GetMembers()
                 .OfType<IPropertySymbol>()
-                .Where(property => !IsIncompletePartialProperty(property, ct))
+                .Where(property =>
+                    !NotifyMemberSelection.ShouldGeneratePartial(property, optIn, ct)
+                )
                 .Select(static property => property.Name)
                 .Intersect(
                     directMembers.Select(static member => member.PropertyName),
@@ -212,7 +215,7 @@ public sealed partial class NotifyGenerator
         foreach (var field in classSymbol.GetMembers().OfType<IFieldSymbol>())
         {
             if (
-                FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible
+                NotifyMemberSelection.ShouldGenerateField(field, optIn)
                 && GeneratedPropertyNameValidation.IsValid(GetPropertyName(field))
             )
                 targetPropertyNames.Add(GetPropertyName(field));
@@ -224,7 +227,7 @@ public sealed partial class NotifyGenerator
             var targetName = member switch
             {
                 IFieldSymbol field
-                    when FieldEligibilityClassifier.Classify(field) == FieldEligibility.Eligible
+                    when NotifyMemberSelection.ShouldGenerateField(field, optIn)
                         && GeneratedPropertyNameValidation.IsValid(GetPropertyName(field)) =>
                     GetPropertyName(field),
                 IPropertySymbol property => property.Name,
@@ -253,6 +256,7 @@ public sealed partial class NotifyGenerator
             classSymbol,
             semanticModel,
             directTargets,
+            optIn,
             ct
         );
 
@@ -286,6 +290,7 @@ public sealed partial class NotifyGenerator
         INamedTypeSymbol classSymbol,
         SemanticModel semanticModel,
         Dictionary<string, ImmutableArray<string>.Builder> directTargets,
+        bool optIn,
         CancellationToken ct
     )
     {
@@ -293,7 +298,7 @@ public sealed partial class NotifyGenerator
         foreach (var field in classSymbol.GetMembers().OfType<IFieldSymbol>())
         {
             if (
-                FieldEligibilityClassifier.Classify(field) != FieldEligibility.Eligible
+                !NotifyMemberSelection.ShouldGenerateField(field, optIn)
                 || !GeneratedPropertyNameValidation.IsValid(GetPropertyName(field))
             )
             {
@@ -373,8 +378,8 @@ public sealed partial class NotifyGenerator
                 var targetName = member switch
                 {
                     IFieldSymbol field
-                        when FieldEligibilityClassifier.Classify(field)
-                            == FieldEligibility.Eligible => GetPropertyName(field),
+                        when NotifyMemberSelection.ShouldGenerateField(field, optIn) =>
+                        GetPropertyName(field),
                     IPropertySymbol property => property.Name,
                     _ => null,
                 };
@@ -402,7 +407,7 @@ public sealed partial class NotifyGenerator
                 semanticModel,
                 classSymbol,
                 fieldToProperty,
-                candidate => IsIncompletePartialProperty(candidate, ct),
+                candidate => NotifyMemberSelection.ShouldGeneratePartial(candidate, optIn, ct),
                 ct
             );
             if (
@@ -638,18 +643,8 @@ public sealed partial class NotifyGenerator
     /// <summary>
     /// Gets the property name from [NotifyName] or derives it from the field name.
     /// </summary>
-    private static string GetPropertyName(IFieldSymbol field)
-    {
-        // Get property name from [NotifyName] or derive from field name (_name -> Name)
-        var notifyNameAttr = field
-            .GetAttributes()
-            .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == NotifyNameAttributeName);
-
-        if (notifyNameAttr?.ConstructorArguments.FirstOrDefault().Value is string customName)
-            return customName;
-
-        return char.ToUpperInvariant(field.Name[1]) + field.Name.Substring(2);
-    }
+    private static string GetPropertyName(IFieldSymbol field) =>
+        NotifyMemberSelection.GetGeneratedPropertyName(field);
 
     private static bool IsNonNullableReferenceType(ITypeSymbol type) =>
         type.IsReferenceType && type.NullableAnnotation != NullableAnnotation.Annotated;

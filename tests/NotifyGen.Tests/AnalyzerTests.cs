@@ -1310,7 +1310,16 @@ public class AnalyzerTests
         var fixableIds = codeFixer.FixableDiagnosticIds;
 
         // Assert
-        fixableIds.Should().BeEquivalentTo("NOTIFY001", "NOTIFY002", "NOTIFY003", "NOTIFY006");
+        fixableIds
+            .Should()
+            .BeEquivalentTo(
+                "NOTIFY001",
+                "NOTIFY002",
+                "NOTIFY003",
+                "NOTIFY006",
+                "NOTIFY022",
+                "NOTIFY023"
+            );
     }
 
     [Fact]

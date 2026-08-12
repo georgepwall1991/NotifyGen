@@ -279,4 +279,30 @@ internal static class DiagnosticDescriptors
         isEnabledByDefault: true,
         description: "Auto-detect only accepts this-property reads, eligible underscore fields, and a closed set of expression operations. Method calls and foreign members require explicit DependsOn."
     );
+
+    /// <summary>
+    /// NOTIFY022: CommunityToolkit property attributes remain on a [Notify] type.
+    /// </summary>
+    public static readonly DiagnosticDescriptor ConvertCommunityToolkitOnNotifyType = new(
+        id: "NOTIFY022",
+        title: "Convert CommunityToolkit property attributes to NotifyGen",
+        messageFormat: "Type '{0}' is marked with [Notify] but still has CommunityToolkit [ObservableProperty] or [NotifyPropertyChangedFor]. Convert them so NotifyGen owns the members and the CommunityToolkit generator does not emit duplicates.",
+        category: "NotifyGen",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "A [Notify] type that still carries CommunityToolkit property attributes should be converted to [NotifyProperty] / [NotifyComputed] to avoid dual generation."
+    );
+
+    /// <summary>
+    /// NOTIFY023: CommunityToolkit property attributes without [Notify].
+    /// </summary>
+    public static readonly DiagnosticDescriptor ConvertCommunityToolkitType = new(
+        id: "NOTIFY023",
+        title: "Use NotifyGen for this CommunityToolkit type",
+        messageFormat: "Type '{0}' uses CommunityToolkit [ObservableProperty] or [NotifyPropertyChangedFor]. Convert it to [Notify] with [NotifyProperty] so unmarked underscore fields stay private.",
+        category: "NotifyGen",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "NotifyGen can take over CommunityToolkit property generation one type at a time without publishing unmarked underscore fields."
+    );
 }

@@ -16,7 +16,7 @@ namespace NotifyGen.Generator;
 
 /// <summary>
 /// Code fixes for common [Notify] mistakes: missing partial, underscore field
-/// names, and nearby [NotifyAlso] typos.
+/// names, nearby [NotifyAlso] typos, and CommunityToolkit property conversion.
 /// </summary>
 [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(NotifyCodeFixProvider))]
 [Shared]
@@ -32,7 +32,9 @@ public sealed class NotifyCodeFixProvider : CodeFixProvider
             DiagnosticDescriptors.ClassMustBePartial.Id,
             DiagnosticDescriptors.NoEligibleFields.Id,
             DiagnosticDescriptors.UnknownNotifyAlsoProperty.Id,
-            DiagnosticDescriptors.ContainingTypeMustBePartial.Id
+            DiagnosticDescriptors.ContainingTypeMustBePartial.Id,
+            DiagnosticDescriptors.ConvertCommunityToolkitOnNotifyType.Id,
+            DiagnosticDescriptors.ConvertCommunityToolkitType.Id
         );
 
     public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
@@ -51,6 +53,34 @@ public sealed class NotifyCodeFixProvider : CodeFixProvider
         if (diagnostic.Id == DiagnosticDescriptors.UnknownNotifyAlsoProperty.Id)
         {
             await RegisterNotifyAlsoFixAsync(context, root, diagnostic).ConfigureAwait(false);
+            return;
+        }
+
+        if (
+            diagnostic.Id == DiagnosticDescriptors.ConvertCommunityToolkitOnNotifyType.Id
+            || diagnostic.Id == DiagnosticDescriptors.ConvertCommunityToolkitType.Id
+        )
+        {
+            var convertType = root.FindToken(diagnosticSpan.Start)
+                .Parent?.AncestorsAndSelf()
+                .OfType<TypeDeclarationSyntax>()
+                .FirstOrDefault();
+            if (convertType is null)
+                return;
+
+            context.RegisterCodeFix(
+                CodeAction.Create(
+                    title: CommunityToolkitMigrationFixer.Title,
+                    createChangedDocument: ct =>
+                        CommunityToolkitMigrationFixer.ConvertAsync(
+                            context.Document,
+                            convertType,
+                            ct
+                        ),
+                    equivalenceKey: CommunityToolkitMigrationFixer.Title
+                ),
+                diagnostic
+            );
             return;
         }
 
@@ -81,6 +111,18 @@ public sealed class NotifyCodeFixProvider : CodeFixProvider
 
         if (diagnostic.Id != DiagnosticDescriptors.NoEligibleFields.Id)
             return;
+
+        var semanticModel = await context
+            .Document.GetSemanticModelAsync(context.CancellationToken)
+            .ConfigureAwait(false);
+        if (
+            semanticModel?.GetDeclaredSymbol(typeDeclaration, context.CancellationToken)
+                is INamedTypeSymbol typeSymbol
+            && NotifyMemberSelection.TypeUsesOptIn(typeSymbol, context.CancellationToken)
+        )
+        {
+            return;
+        }
 
         var renameable = await GetRenameableFieldsAsync(
                 context.Document,
@@ -263,17 +305,7 @@ public sealed class NotifyCodeFixProvider : CodeFixProvider
             if (FieldEligibilityClassifier.Classify(field) != FieldEligibility.Eligible)
                 continue;
 
-            var customName =
-                field
-                    .GetAttributes()
-                    .FirstOrDefault(attribute =>
-                        attribute.AttributeClass?.ToDisplayString()
-                        == "NotifyGen.NotifyNameAttribute"
-                    )
-                    ?.ConstructorArguments.FirstOrDefault()
-                    .Value as string;
-            yield return customName
-                ?? (char.ToUpperInvariant(field.Name[1]) + field.Name.Substring(2));
+            yield return NotifyMemberSelection.GetGeneratedPropertyName(field);
         }
     }
 

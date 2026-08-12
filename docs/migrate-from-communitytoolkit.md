@@ -7,13 +7,14 @@ NotifyGen is a **narrow INPC source generator**. Keep CommunityToolkit.Mvvm for 
 1. **Keep CT packages** — do not remove `CommunityToolkit.Mvvm` if you use commands, messengers, or DI helpers.
 2. **Add NotifyGen** — `dotnet add package NotifyGen`.
 3. **Pick one ViewModel** — migrate a single type first (not the whole solution).
-4. **Mark the class** — add `[Notify]` and ensure the type is `partial`.
-5. **Drop `[ObservableProperty]`** — leave underscore fields; NotifyGen generates the properties.
-6. **Map dependents** — prefer `[NotifyComputed]` on the derived property; `[NotifyPropertyChangedFor]` can also become `[NotifyAlso]` on each source.
-7. **Map commands** — keep `[NotifyCanExecuteChangedFor]` (same name) pointing at CT `IRelayCommand` properties.
-8. **Base class** — `ObservableObject` is optional. Prefer your own INPC host; NotifyGen reuses accessible `OnPropertyChanged`.
-9. **Leave out of scope on CT** — messenger recipients, validation/INDEI, navigation.
-10. **Verify** — build, bind once in UI, then migrate the next ViewModel.
+4. **Lightbulb / Fix All** — **NOTIFY023** (no `[Notify]` yet) or **NOTIFY022** (already `[Notify]`) converts the type. Do not delete `[ObservableProperty]` by hand.
+5. **What the fixer does** — adds `[Notify]` + `partial`, replaces `[ObservableProperty]` with `[NotifyProperty]` (opt-in), maps `[NotifyPropertyChangedFor]` to `[NotifyComputed]` on get-only dependents, leaves `RelayCommand` alone.
+6. **Unmarked `_fields` stay private** — `_logger`, `_disposed`, and other underscore fields without `[NotifyProperty]` are not published.
+7. **Map leftover dependents by hand only if needed** — `[NotifyComputed]` on the derived property, or `[NotifyAlso]` on a source.
+8. **Map commands** — keep `[NotifyCanExecuteChangedFor]` pointing at CT `IRelayCommand` properties.
+9. **Base class** — `ObservableObject` is optional. Prefer your own INPC host; NotifyGen reuses accessible `OnPropertyChanged`.
+10. **Leave out of scope on CT** — messenger recipients, validation/INDEI, navigation.
+11. **Verify** — build, bind once in UI, then migrate the next ViewModel.
 
 Paste-friendly status for Discussions / Stack Overflow:
 
@@ -27,7 +28,7 @@ Blocked on: ________
 
 | CommunityToolkit | NotifyGen |
 |------------------|-----------|
-| `[ObservableProperty]` on a field | `[Notify]` on the **class** + underscore field (`_name` → `Name`) |
+| `[ObservableProperty]` on a field | `[Notify]` on the class + `[NotifyProperty]` on the field (opt-in; unmarked `_logger` stays private) |
 | C# partial properties with CT | C# 14 incomplete partial properties under `[Notify]` |
 | `[NotifyPropertyChangedFor(nameof(X))]` | `[NotifyComputed]` on `X`, or `[NotifyAlso(nameof(X))]` on each source |
 | Proposed `[ComputedProperty]` (CT #1175) | `[NotifyComputed]` / `[NotifyComputed(nameof(...))]` |
@@ -50,12 +51,15 @@ public partial class Person : ObservableObject
     private string _firstName;
 }
 
-// NotifyGen
+// NotifyGen (or accept the NOTIFY023 code-fix)
 [Notify]
 public partial class Person
 {
+    [NotifyProperty]
     [NotifyAlso(nameof(FullName))]
     private string _firstName;
+
+    private readonly ILogger _logger; // stays private
 }
 ```
 
