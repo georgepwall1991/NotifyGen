@@ -25,17 +25,18 @@ public class ComputedPropertyBenchmarks
         _explicit = new NotifyGenExplicitViewModel();
         _toolkit = new CommunityToolkitComputedViewModel();
         _fody = new FodyComputedViewModel();
-        _computed.PropertyChanged += OnPropertyChanged;
-        _explicit.PropertyChanged += OnPropertyChanged;
-        _toolkit.PropertyChanged += OnPropertyChanged;
-        _fody.PropertyChanged += OnPropertyChanged;
+        AttachListener(_computed);
+        AttachListener(_explicit);
+        AttachListener(_toolkit);
+        AttachListener(_fody);
         _counter = 0;
     }
 
-    private static void OnPropertyChanged(object? sender, PropertyChangedEventArgs args)
-    {
-    }
-    }
+    // Fody weaves INotifyPropertyChanged after compile, so subscribe through the interface.
+    private static void AttachListener(object source) =>
+        ((INotifyPropertyChanged)source).PropertyChanged += OnPropertyChanged;
+
+    private static void OnPropertyChanged(object? sender, PropertyChangedEventArgs args) { }
 
     [BenchmarkCategory("Changed"), Benchmark(Baseline = true)]
     public void NotifyGen_NotifyComputed()

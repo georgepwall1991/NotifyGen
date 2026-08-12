@@ -451,12 +451,11 @@ public class NotifyComputedTests
             """;
 
         var result = GeneratorTestHelper.RunGenerator(source);
+        result.Diagnostics.Should().NotContain(diagnostic => diagnostic.Id == "CS8785");
         result
-            .Diagnostics.Should()
-            .NotContain(diagnostic =>
-                diagnostic.Id == "CS8785"
-                || diagnostic.GetMessage().Contains("NullReferenceException")
-            );
+            .Diagnostics.Select(static diagnostic => diagnostic.GetMessage())
+            .Should()
+            .NotContain(message => message.Contains("NullReferenceException"));
         result
             .OutputCompilation.GetDiagnostics()
             .Should()
