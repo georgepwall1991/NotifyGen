@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>NotifyGen | NotifyGen </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="NotifyGen | NotifyGen ">
+      
+      
+      <link rel="icon" href="favicon.ico">
+      <link rel="stylesheet" href="public/docfx.min.css">
+      <link rel="stylesheet" href="public/main.css">
+      <meta name="docfx:navrel" content="toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/georgepwall1991/NotifyGen/blob/master/docs/site/index.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="index.html">
+            <img id="logo" class="svg" src="assets/icon.png" alt="NotifyGen">
+            NotifyGen
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="notifygen">NotifyGen</h1>
+
+<p><strong>Zero-runtime <code>INotifyPropertyChanged</code> source generator.</strong></p>
+<p><img src="assets/demo.gif" alt="NotifyGen binding demo"></p>
+<pre><code class="lang-bash">dotnet add package NotifyGen
+</code></pre>
+<pre><code class="lang-csharp">using NotifyGen;
+
+[Notify]
+public partial class Person
+{
+    private string _firstName;
+    private string _lastName;
+
+    [NotifyComputed]
+    public string FullName =&gt; $&quot;{FirstName} {LastName}&quot;;
+}
+</code></pre>
+<h2 id="start-here">Start here</h2>
+<ul>
+<li><a href="before-after.html">Generated code before / after</a> — aha without cloning</li>
+<li><a href="migrate.html">Migrate from CommunityToolkit</a> — coexistence checklist</li>
+<li><a href="features.html">Features</a> — full reference</li>
+<li><a href="samples.html">Samples</a> — WPF, Avalonia, MAUI, Hybrid</li>
+</ul>
+<p><strong>Recommended stack:</strong> NotifyGen for properties, CommunityToolkit.Mvvm for commands.</p>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/georgepwall1991/NotifyGen/blob/master/docs/site/index.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          NotifyGen — zero-runtime INPC source generator
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

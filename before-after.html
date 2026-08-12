@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Generated code — before / after | NotifyGen </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Generated code — before / after | NotifyGen ">
+      
+      
+      <link rel="icon" href="favicon.ico">
+      <link rel="stylesheet" href="public/docfx.min.css">
+      <link rel="stylesheet" href="public/main.css">
+      <meta name="docfx:navrel" content="toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/georgepwall1991/NotifyGen/blob/master/docs/site/before-after.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="index.html">
+            <img id="logo" class="svg" src="assets/icon.png" alt="NotifyGen">
+            NotifyGen
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="generated-code--before--after">Generated code — before / after</h1>
+
+<p>Aha without cloning: what NotifyGen emits for a typical ViewModel.</p>
+<h2 id="before-you-write">Before (you write)</h2>
+<pre><code class="lang-csharp">using NotifyGen;
+
+[Notify]
+public partial class Person
+{
+    private string _firstName;
+    private string _lastName;
+
+    [NotifyComputed]
+    public string FullName =&gt; $&quot;{FirstName} {LastName}&quot;;
+
+    partial void OnFirstNameChanged(string oldValue, string newValue);
+}
+</code></pre>
+<h2 id="after-generator-emits--inspectable-c">After (generator emits — inspectable C#)</h2>
+<pre><code class="lang-csharp">// &lt;auto-generated/&gt;
+#nullable enable
+
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+
+partial class Person : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public string FirstName
+    {
+        get =&gt; _firstName;
+        set
+        {
+            if (EqualityComparer&lt;string&gt;.Default.Equals(_firstName, value)) return;
+            var oldValue = _firstName;
+            OnFirstNameChanging(oldValue, value);
+            _firstName = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(FullName));
+            OnFirstNameChanged();
+            OnFirstNameChanged(oldValue, value);
+        }
+    }
+
+    public string LastName
+    {
+        get =&gt; _lastName;
+        set
+        {
+            if (EqualityComparer&lt;string&gt;.Default.Equals(_lastName, value)) return;
+            var oldValue = _lastName;
+            OnLastNameChanging(oldValue, value);
+            _lastName = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(FullName));
+            OnLastNameChanged();
+            OnLastNameChanged(oldValue, value);
+        }
+    }
+
+    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    partial void OnFirstNameChanging(string oldValue, string newValue);
+    partial void OnFirstNameChanged();
+    partial void OnFirstNameChanged(string oldValue, string newValue);
+    partial void OnLastNameChanging(string oldValue, string newValue);
+    partial void OnLastNameChanged();
+    partial void OnLastNameChanged(string oldValue, string newValue);
+}
+</code></pre>
+<h2 id="why-this-matters">Why this matters</h2>
+<ul>
+<li><strong>No runtime package</strong> — generated C# only</li>
+<li><strong>Debuggable</strong> — set breakpoints in the partial you own; step into equality guards</li>
+<li><strong>Host reuse</strong> — if a base already implements INPC, NotifyGen calls that invoker instead of emitting a second event</li>
+</ul>
+<p>Next: <a href="migrate.html">Migration from CommunityToolkit</a> · <a href="features.html">Features</a></p>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/georgepwall1991/NotifyGen/blob/master/docs/site/before-after.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          NotifyGen — zero-runtime INPC source generator
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

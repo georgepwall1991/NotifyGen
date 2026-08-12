@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>NotifyGen | NotifyGen </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="NotifyGen | NotifyGen ">
+      
+      
+      <link rel="icon" href="favicon.ico">
+      <link rel="stylesheet" href="public/docfx.min.css">
+      <link rel="stylesheet" href="public/main.css">
+      <meta name="docfx:navrel" content="toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/georgepwall1991/NotifyGen/blob/master/docs/site/features.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="index.html">
+            <img id="logo" class="svg" src="assets/icon.png" alt="NotifyGen">
+            NotifyGen
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+
+<blockquote>
+<p>Full feature reference moved from the root README for NotifyGen 2.0.</p>
+</blockquote>
+<p><img src="https://raw.githubusercontent.com/georgepwall1991/NotifyGen/master/assets/header.png" alt="NotifyGen Banner"></p>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/georgepwall1991/NotifyGen/master/assets/icon.png" alt="NotifyGen Icon" width="128" height="128">
+</p>
+<h1 id="notifygen">NotifyGen</h1>
+<p><a href="https://www.nuget.org/packages/NotifyGen/"><img src="https://img.shields.io/nuget/v/NotifyGen.svg" alt="NuGet"></a>
+<a href="https://www.nuget.org/packages/NotifyGen/"><img src="https://img.shields.io/nuget/dt/NotifyGen.svg" alt="NuGet Downloads"></a>
+<a href="https://github.com/georgepwall1991/NotifyGen/actions/workflows/ci.yml"><img src="https://github.com/georgepwall1991/NotifyGen/actions/workflows/ci.yml/badge.svg" alt="Build Status"></a>
+<a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-Standard%202.0%2B-512BD4" alt=".NET"></a>
+<a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a></p>
+<p><strong>Stop writing INotifyPropertyChanged boilerplate. Let the compiler do it.</strong></p>
+<h2 id="the-problem">The Problem</h2>
+<p>Every WPF, MAUI, or Blazor developer knows this pain. You want one property:</p>
+<pre><code class="lang-csharp">private string _name;
+</code></pre>
+<p>But you end up writing this:</p>
+<pre><code class="lang-csharp">private string _name;
+public string Name
+{
+    get =&gt; _name;
+    set
+    {
+        if (_name != value)
+        {
+            _name = value;
+            OnPropertyChanged();
+        }
+    }
+}
+</code></pre>
+<p>Multiply that by every property in your ViewModels. It's tedious, error-prone, and clutters your code with repetitive boilerplate.</p>
+<h2 id="the-solution">The Solution</h2>
+<pre><code class="lang-csharp">using NotifyGen;
+
+[Notify]
+public partial class Person
+{
+    private string _name;
+    private int _age;
+    private string? _email;
+}
+</code></pre>
+<p>NotifyGen generates the rest at compile time. No runtime reflection. No IL weaving. Just clean, debuggable C#.</p>
+<h2 id="what-gets-generated">What Gets Generated</h2>
+<p>For the <code>Person</code> class above, NotifyGen generates:</p>
+<pre><code class="lang-csharp">public partial class Person : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public string Name
+    {
+        get =&gt; _name;
+        set
+        {
+            if (EqualityComparer&lt;string&gt;.Default.Equals(_name, value)) return;
+            OnNameChanging(_name, value);
+            _name = value;
+            OnPropertyChanged();
+            OnNameChanged();
+        }
+    }
+
+    public int Age
+    {
+        get =&gt; _age;
+        set
+        {
+            if (_age == value) return;  // Direct comparison for primitives
+            OnAgeChanging(_age, value);
+            _age = value;
+            OnPropertyChanged();
+            OnAgeChanged();
+        }
+    }
+
+    public string? Email
+    {
+        get =&gt; _email;
+        set
+        {
+            if (EqualityComparer&lt;string?&gt;.Default.Equals(_email, value)) return;
+            OnEmailChanging(_email, value);
+            _email = value;
+            OnPropertyChanged();
+            OnEmailChanged();
+        }
+    }
+
+    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        =&gt; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+    partial void OnNameChanging(string oldValue, string newValue);
+    partial void OnNameChanged();
+    partial void OnAgeChanging(int oldValue, int newValue);
+    partial void OnAgeChanged();
+    partial void OnEmailChanging(string? oldValue, string? newValue);
+    partial void OnEmailChanged();
+}
+</code></pre>
+<p>This generated code is visible in your IDE (look under Dependencies → Analyzers → NotifyGen). You can step through it in the debugger.</p>
+<h2 id="installation">Installation</h2>
+<pre><code class="lang-bash">dotnet add package NotifyGen
+</code></pre>
+<p>Or via Package Manager:</p>
+<pre><code>Install-Package NotifyGen
+</code></pre>
+<h2 id="real-world-example">Real-World Example</h2>
+<p>Here's a more complete ViewModel showing several features working together:</p>
+<pre><code class="lang-csharp">using NotifyGen;
+
+[Notify(ImplementChanging = true)]  // Enable PropertyChanging for undo/redo
+[NotifySuppressable]                 // Enable batch notification suppression
+public partial class CustomerViewModel
+{
+    // Basic properties - just declare the field
+    [NotifyAlso(&quot;FullName&quot;)]
+    private string _firstName;
+
+    [NotifyAlso(&quot;FullName&quot;)]
+    private string _lastName;
+
+    private string? _email;
+
+    // Notify dependent properties and refresh save command
+    [NotifyAlso(&quot;CanSave&quot;)]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private string _company;
+
+    // Private setter - can only be set internally
+    [NotifySetter(AccessLevel.Private)]
+    private int _id;
+
+    // Custom property name with command notification
+    [NotifyName(&quot;IsPreferredCustomer&quot;)]
+    [NotifyCanExecuteChangedFor(nameof(ApplyDiscountCommand))]
+    private bool _preferred;
+
+    // Exclude from generation - manage manually
+    [NotifyIgnore]
+    private readonly ICustomerService _customerService;
+
+    // Computed property that depends on FirstName and LastName
+    public string FullName =&gt; $&quot;{FirstName} {LastName}&quot;.Trim();
+
+    // Validation property
+    public bool CanSave =&gt; !string.IsNullOrWhiteSpace(FirstName)
+                        &amp;&amp; !string.IsNullOrWhiteSpace(Company);
+
+    // Commands with auto-refreshing CanExecute
+    public IRelayCommand SaveCommand { get; }
+    public IRelayCommand ApplyDiscountCommand { get; }
+
+    public CustomerViewModel(ICustomerService customerService)
+    {
+        _customerService = customerService;
+        SaveCommand = new RelayCommand(Save, () =&gt; CanSave);
+        ApplyDiscountCommand = new RelayCommand(ApplyDiscount, () =&gt; IsPreferredCustomer);
+    }
+
+    // Bulk update without intermediate notifications
+    public void LoadFromDto(CustomerDto dto)
+    {
+        using (SuppressNotifications())
+        {
+            FirstName = dto.FirstName;
+            LastName = dto.LastName;
+            Email = dto.Email;
+            Company = dto.Company;
+        }  // Single batch of PropertyChanged events fires here
+    }
+
+    // Hook into property changes for validation
+    partial void OnFirstNameChanging(string oldValue, string newValue)
+    {
+        if (newValue?.Length &gt; 100)
+            throw new ArgumentException(&quot;First name too long&quot;);
+    }
+
+    // React to changes
+    partial void OnEmailChanged()
+    {
+        ValidateEmail();
+    }
+
+    private void Save() { /* ... */ }
+    private void ApplyDiscount() { /* ... */ }
+    private void ValidateEmail() { /* ... */ }
+}
+</code></pre>
+<p>Bind it in XAML:</p>
+<pre><code class="lang-xml">&lt;StackPanel DataContext=&quot;{Binding CustomerViewModel}&quot;&gt;
+    &lt;TextBox Text=&quot;{Binding FirstName, UpdateSourceTrigger=PropertyChanged}&quot; /&gt;
+    &lt;TextBox Text=&quot;{Binding LastName, UpdateSourceTrigger=PropertyChanged}&quot; /&gt;
+    &lt;TextBlock Text=&quot;{Binding FullName}&quot; /&gt;
+    &lt;CheckBox IsChecked=&quot;{Binding IsPreferredCustomer}&quot; Content=&quot;Preferred Customer&quot; /&gt;
+    &lt;Button Content=&quot;Save&quot; IsEnabled=&quot;{Binding CanSave}&quot; /&gt;
+&lt;/StackPanel&gt;
+</code></pre>
+<h2 id="features">Features</h2>
+<h3 id="field-naming-convention">Field Naming Convention</h3>
+<p>NotifyGen uses underscore-prefixed private fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Generated Property</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_name</code></td>
+<td><code>Name</code></td>
+</tr>
+<tr>
+<td><code>_firstName</code></td>
+<td><code>FirstName</code></td>
+</tr>
+<tr>
+<td><code>_isEnabled</code></td>
+<td><code>IsEnabled</code></td>
+</tr>
+<tr>
+<td><code>_id</code></td>
+<td><code>Id</code></td>
+</tr>
+</tbody>
+</table>
+<p>The underscore is stripped and the first letter is capitalized.</p>
+<h3 id="partial-property-mode-c-14">Partial-property mode (C# 14)</h3>
+<p>When the project uses a C# 14/preview compiler, <code>[Notify]</code> can also implement
+an incomplete partial property. This is useful when a type already inherits
+from another base class and cannot adopt an MVVM framework base type:</p>
+<pre><code class="lang-csharp">[Notify]
+public partial class PlainEntity : FrameworkEntity
+{
+    [NotifyAlso(nameof(DisplayName))]
+    public partial string Name { get; set; }
+
+    public string DisplayName =&gt; Name.Trim();
+}
+</code></pre>
+<p>NotifyGen supplies the <code>field</code> implementation, equality guard, existing
+old/new partial hooks, and <code>NotifyAlso</code> notifications while retaining the
+user's base class. This mode adds no runtime dependency. Existing underscore
+field mode remains available for older language versions. See the
+<a href="https://github.com/georgepwall1991/NotifyGen/blob/master/docs/design/partial-properties.md">design proof</a> and
+<a href="https://github.com/georgepwall1991/NotifyGen/blob/master/tests/NotifyGen.Tests/PartialPropertyTests.cs"><code>PartialPropertyTests</code></a>.</p>
+<h3 id="property-metadata-forwarding">Property Metadata Forwarding</h3>
+<p>Attributes on an eligible field that are valid for properties are copied to the
+generated property. Explicit <code>[property:]</code>, <code>[get:]</code>, and <code>[set:]</code> targets are
+also forwarded onto the generated property or accessors (CS0657/CS0658 are
+suppressed for <code>[Notify]</code> fields). This keeps validation, serialization, and
+binding metadata attached without making NotifyGen implement those frameworks:</p>
+<pre><code class="lang-csharp">[Notify]
+public partial class Person
+{
+    [System.ComponentModel.DataAnnotations.Required]
+    [property: System.Text.Json.Serialization.JsonPropertyName(&quot;displayName&quot;)]
+    [get: System.Obsolete(&quot;prefer DisplayLabel&quot;)]
+    private string _displayName = string.Empty;
+}
+</code></pre>
+<p>Field-only attributes and NotifyGen control attributes are not copied. File-local
+attribute types (or file-local types used as attribute arguments) are skipped
+because generated source is a separate file. See the
+<a href="https://github.com/georgepwall1991/NotifyGen/blob/master/docs/design/property-metadata-forwarding.md">metadata design</a>,
+<a href="https://github.com/georgepwall1991/NotifyGen/blob/master/docs/design/accessor-target-metadata.md">accessor-target design</a>,
+<a href="https://github.com/georgepwall1991/NotifyGen/blob/master/tests/NotifyGen.Tests/PropertyMetadataTests.cs"><code>PropertyMetadataTests</code></a>, and
+<a href="https://github.com/georgepwall1991/NotifyGen/blob/master/tests/NotifyGen.Tests/Cycle5Tests.cs"><code>Cycle5Tests</code></a>.</p>
+<h3 id="what-fields-are-eligible">What Fields Are Eligible?</h3>
+<p>NotifyGen generates properties only for mutable, private instance fields with an underscore prefix. The <code>private</code> modifier may be explicit or implicit. Here's what works and what doesn't:</p>
+<p><strong>✅ Eligible Fields:</strong></p>
+<pre><code class="lang-csharp">private string _name;           // ✓ Instance, private, underscore
+private int _age;               // ✓ All types work (primitives, classes, structs)
+private bool? _isActive;        // ✓ Nullable types supported
+string _implicitPrivate;        // ✓ Fields without a modifier are private in a class
+</code></pre>
+<p><strong>❌ Ineligible Fields:</strong></p>
+<pre><code class="lang-csharp">public string _name;            // ✗ Must be private
+protected string _name;         // ✗ Must be private
+internal string _name;          // ✗ Must be private
+
+static string _name;            // ✗ Static fields cannot trigger instance events
+const string _name = &quot;John&quot;;    // ✗ Const fields are immutable
+readonly string _name;          // ✗ Readonly fields cannot have setters
+
+private string name;            // ✗ Missing underscore prefix
+private string _;               // ✗ Too short (need at least 2 characters)
+</code></pre>
+<p><strong>Diagnostics Help You:</strong></p>
+<p>If you mark a class with <code>[Notify]</code> but have no eligible fields, NotifyGen will show:</p>
+<pre><code>NOTIFY002: Class 'MyClass' is marked with [Notify] but has no private fields with underscore prefix (e.g., '_fieldName'). No properties will be generated.
+</code></pre>
+<p><strong>Excluding Fields with [NotifyIgnore]:</strong></p>
+<pre><code class="lang-csharp">[Notify]
+public partial class ViewModel
+{
+    private string _name;           // ✓ Generates Name property
+
+    [NotifyIgnore]                  // Explicitly excluded
+    private readonly ILogger _logger;
+}
+</code></pre>
+<p>Use <code>[NotifyIgnore]</code> on fields you want to exclude from generation (e.g., services, readonly state).</p>
+<h3 id="opt-in-members-with-notifyproperty">Opt-in members with <code>[NotifyProperty]</code></h3>
+<p>Greenfield <code>[Notify]</code> types still generate every eligible underscore field. If any
+member is marked <code>[NotifyProperty]</code> — or CommunityToolkit <code>[ObservableProperty]</code> —
+NotifyGen switches that type to <strong>opt-in</strong>: only marked fields and incomplete
+partials become properties. Unmarked <code>_logger</code> / <code>_disposed</code> stay private. The
+<strong>NOTIFY022</strong> / <strong>NOTIFY023</strong> code-fix performs this conversion.</p>
+<h3 id="equality-guards">Equality Guards</h3>
+<p>Every generated setter checks if the value actually changed before doing anything:</p>
+<pre><code class="lang-csharp">// For primitive types (int, bool, double, etc.) - direct comparison
+if (_age == value) return;
+
+// For reference types and complex value types - EqualityComparer
+if (EqualityComparer&lt;string&gt;.Default.Equals(_name, value)) return;
+</code></pre>
+<p>NotifyGen automatically detects primitive types and uses direct <code>==</code> comparison for maximum performance. This prevents unnecessary <code>PropertyChanged</code> events and infinite loops from two-way bindings. Works correctly with nulls, value types, and reference types.</p>
+<h3 id="computed-properties-with-notifycomputed">Computed properties with <code>[NotifyComputed]</code></h3>
+<p>Put the dependency on the derived property instead of repeating <code>[NotifyAlso]</code>
+on every source field. With no arguments, NotifyGen walks a bounded getter
+(this-property identifiers, eligible <code>_fields</code>, interpolation, and a closed
+expression set). Method calls and foreign members are rejected with <strong>NOTIFY021</strong>
+unless you pass explicit names:</p>
+<pre><code class="lang-csharp">[Notify]
+public partial class Person
+{
+    private string _firstName;
+    private string _lastName;
+
+    [NotifyComputed]
+    public string FullName =&gt; $&quot;{FirstName} {LastName}&quot;;
+
+    [NotifyComputed]
+    public string Greeting =&gt; $&quot;Hello, {FullName}&quot;;
+
+    [NotifyComputed(nameof(FirstName), nameof(LastName))]
+    public string Initials =&gt; string.Concat(FirstName.AsSpan(0, 1), LastName.AsSpan(0, 1));
+}
+</code></pre>
+<p>Changing <code>FirstName</code> raises <code>FullName</code> and <code>Greeting</code>. Same-value equality
+guards still suppress the whole fan-out. <code>[NotifyAlso]</code> / <code>NotifyFrom</code> remain
+valid and merge into the same graph. See the
+<a href="../design/notifycomputed.md">computed-property design</a> and
+<a href="../../tests/NotifyGen.Tests/NotifyComputedTests.cs"><code>NotifyComputedTests</code></a>.</p>
+<h3 id="dependent-properties-with-notifyalso">Dependent Properties with <code>[NotifyAlso]</code></h3>
+<p>When one property affects another, use <code>[NotifyAlso]</code> to notify both:</p>
+<pre><code class="lang-csharp">[Notify]
+public partial class Rectangle
+{
+    [NotifyAlso(&quot;Area&quot;)]
+    [NotifyAlso(&quot;Perimeter&quot;)]
+    private double _width;
+
+    [NotifyAlso(&quot;Area&quot;)]
+    [NotifyAlso(&quot;Perimeter&quot;)]
+    private double _height;
+
+    public double Area =&gt; Width * Height;
+    public double Perimeter =&gt; 2 * (Width + Height);
+}
+</code></pre>
+<p>When <code>Width</code> changes, <code>PropertyChanged</code> fires for <code>Width</code>, <code>Area</code>, and <code>Perimeter</code>.</p>
+<p>A dependent generated property can declare its source instead, which is useful
+when the dependency is easiest to read from the target side:</p>
+<pre><code class="lang-csharp">[NotifyAlso(nameof(FirstName), NotifyFrom = true)]
+private string _displayName;
+</code></pre>
+<p>This says that changing generated <code>FirstName</code> also raises generated
+<code>DisplayName</code>. <code>NotifyFrom = true</code> remains an explicit same-type graph edge; it
+does not inspect getter expressions. Its source must be another property
+generated by NotifyGen. See the <a href="https://github.com/georgepwall1991/NotifyGen/blob/master/docs/design/notifyalso-target-dependencies.md">target-side dependency design</a>.</p>
+<p>Dependencies may be chained. If <code>FirstName</code> notifies <code>DisplayName</code> and
+<code>DisplayName</code> notifies <code>SearchText</code>, changing <code>FirstName</code> raises all three
+names. A diamond is deduplicated, so each reachable name is raised once. A
+cycle is rejected at compile time with <code>NOTIFY008</code>, including the dependency
+path in the diagnostic instead of silently bounding the traversal. See the
+<a href="https://github.com/georgepwall1991/NotifyGen/blob/master/docs/design/notifyalso-transitive-cycles.md">transitive dependency proof</a> and
+<a href="https://github.com/georgepwall1991/NotifyGen/blob/master/tests/NotifyGen.Tests/IntegrationTests.cs"><code>IntegrationTests.NotifyAlso_TransitiveChainAndDiamond_AreDeduplicated</code></a>.</p>
+<h3 id="child-property-notifications-with-notifyonsubpropertychanged">Child Property Notifications with <code>NotifyOnSubPropertyChanged</code></h3>
+<p>For a computed property that depends on a child object's changes, opt in on the
+existing <code>[NotifyAlso]</code> attribute:</p>
+<pre><code class="lang-csharp">[Notify]
+public partial class CustomerViewModel
+{
+    [NotifyAlso(nameof(DisplayName), NotifyOnSubPropertyChanged = true)]
+    private Address? _address;
+
+    public string DisplayName =&gt; Address?.City ?? string.Empty;
+}
+
+public sealed class Address : INotifyPropertyChanged
+{
+    public string City { get; set; } = string.Empty;
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
+</code></pre>
+<p>NotifyGen subscribes to the child's ordinary <code>INotifyPropertyChanged</code> event,
+detaches the old value when <code>Address</code> is replaced, and raises <code>DisplayName</code> for
+any child change. Tracking starts when the generated source property is first
+accessed or assigned; source generators cannot inject initialization into every
+user constructor. The option is direct and explicit: it does not inspect getter
+expressions, traverse arbitrary object graphs, or subscribe to collections.
+<code>NOTIFY010</code> warns when the source type is not a reference value implementing
+<code>INotifyPropertyChanged</code>. See the <a href="https://github.com/georgepwall1991/NotifyGen/blob/master/docs/design/notifyalso-subproperty.md">design proof</a>
+and <a href="https://github.com/georgepwall1991/NotifyGen/blob/master/tests/NotifyGen.Tests/SubPropertyNotificationTests.cs"><code>SubPropertyNotificationTests</code></a>.</p>
+<h3 id="hosting-an-existing-inotifypropertychanged-implementation">Hosting an Existing <code>INotifyPropertyChanged</code> Implementation</h3>
+<p>A <code>[Notify]</code> type may inherit an existing <code>INotifyPropertyChanged</code>
+implementation. NotifyGen reuses an accessible instance
+<code>OnPropertyChanged(string)</code> (including nullable/optional string parameters) or
+<code>OnPropertyChanged(PropertyChangedEventArgs)</code> method instead of generating a
+second interface, event, or helper. This supports framework view-model bases
+without reflection or a runtime package dependency:</p>
+<pre><code class="lang-csharp">public abstract class ViewModelBase : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+    protected void OnPropertyChanged(PropertyChangedEventArgs args) =&gt;
+        PropertyChanged?.Invoke(this, args);
+}
+
+[Notify]
+public partial class Person : ViewModelBase
+{
+    private string _name = string.Empty;
+}
+</code></pre>
+<p>If an existing INPC implementation has no callable ordinary invoker (for
+example, it only has an explicit interface event), NotifyGen withholds the
+extension and reports <code>NOTIFY013</code> rather than emitting uncompilable code.
+When <code>ImplementChanging = true</code>, the equivalent
+<code>OnPropertyChanging(string)</code>/<code>OnPropertyChanging(PropertyChangingEventArgs)</code>
+host is required and <code>NOTIFY017</code> reports an incompatible host.</p>
+<h3 id="collection-membership-notifications">Collection Membership Notifications</h3>
+<p>Use <code>NotifyOnCollectionChanged = true</code> on a source-side <code>[NotifyAlso]</code>
+declaration to notify a computed property when the source collection raises
+<code>INotifyCollectionChanged.CollectionChanged</code>:</p>
+<pre><code class="lang-csharp">[Notify]
+public partial class Basket
+{
+    [NotifyAlso(nameof(Count), NotifyOnCollectionChanged = true)]
+    private ObservableCollection&lt;string&gt; _items = new();
+
+    public int Count =&gt; Items.Count;
+}
+</code></pre>
+<p>NotifyGen attaches lazily on first access or assignment, detaches replaced and
+null collections, and raises each declared target once per collection event.
+It does not bubble item <code>INotifyPropertyChanged</code> events, infer dependencies
+from getter expressions, or add a runtime collection helper. Collection
+tracking is source-side only; <code>NotifyFrom = true</code> with this option reports
+<code>NOTIFY014</code>. A value source reports <code>NOTIFY015</code>, while a reference source is
+safely checked at runtime so custom collection implementations are supported.
+See the <a href="https://github.com/georgepwall1991/NotifyGen/blob/master/docs/design/notifyalso-collection-changes.md">collection design proof</a>
+and <a href="https://github.com/georgepwall1991/NotifyGen/blob/master/tests/NotifyGen.Tests/Cycle4Tests.cs"><code>Cycle4Tests</code></a>.</p>
+<h3 id="custom-property-names-with-notifyname">Custom Property Names with <code>[NotifyName]</code></h3>
+<p>Override the default naming:</p>
+<pre><code class="lang-csharp">[NotifyName(&quot;IsVisible&quot;)]
+private bool _shown;  // Generates IsVisible, not Shown
+
+[NotifyName(&quot;CustomerID&quot;)]
+private int _custId;  // Generates CustomerID, not CustId
+</code></pre>
+<h3 id="setter-access-control-with-notifysetter">Setter Access Control with <code>[NotifySetter]</code></h3>
+<p>Restrict who can set the property:</p>
+<pre><code class="lang-csharp">[NotifySetter(AccessLevel.Private)]
+private int _id;
+// Result: public int Id { get; private set; }
+
+[NotifySetter(AccessLevel.Protected)]
+private string _internalState;
+// Result: public string InternalState { get; protected set; }
+
+[NotifySetter(AccessLevel.Internal)]
+private DateTime _lastModified;
+// Result: public DateTime LastModified { get; internal set; }
+</code></pre>
+<p>Available levels: <code>Public</code>, <code>Private</code>, <code>Protected</code>, <code>Internal</code>, <code>ProtectedInternal</code>, <code>PrivateProtected</code></p>
+<h3 id="excluding-fields-with-notifyignore">Excluding Fields with <code>[NotifyIgnore]</code></h3>
+<p>Some fields shouldn't become properties:</p>
+<pre><code class="lang-csharp">[Notify]
+public partial class ViewModel
+{
+    private string _name;  // Generates property
+
+    [NotifyIgnore]
+    private readonly ILogger _logger;  // No property
+
+    [NotifyIgnore]
+    private Dictionary&lt;string, object&gt; _cache;  // No property
+}
+</code></pre>
+<h3 id="partial-hooks">Partial Hooks</h3>
+<p>Every property gets two optional hooks:</p>
+<p><strong><code>On{Property}Changing(oldValue, newValue)</code></strong> - Called before the value changes. Use for validation:</p>
+<pre><code class="lang-csharp">partial void OnAgeChanging(int oldValue, int newValue)
+{
+    if (newValue &lt; 0 || newValue &gt; 150)
+        throw new ArgumentOutOfRangeException(nameof(newValue), &quot;Invalid age&quot;);
+}
+</code></pre>
+<p><strong><code>On{Property}Changed()</code></strong> - Called after the value changes. Use for side effects:</p>
+<pre><code class="lang-csharp">partial void OnSelectedItemChanged()
+{
+    LoadItemDetails();
+    UpdateCommandStates();
+}
+</code></pre>
+<p>An optional typed overload receives both values:</p>
+<pre><code class="lang-csharp">partial void OnNameChanged(string oldValue, string newValue)
+{
+    AuditChange(oldValue, newValue);
+}
+</code></pre>
+<p>The typed overload runs after assignment and the parameterless overload. If you
+don't implement these methods, the compiler removes the calls entirely—no
+performance cost.</p>
+<h3 id="integration-with-validation-frameworks">Integration with Validation Frameworks</h3>
+<p>NotifyGen's partial hooks make it easy to integrate with validation libraries:</p>
+<h4 id="fluentvalidation">FluentValidation</h4>
+<pre><code class="lang-csharp">using FluentValidation;
+using NotifyGen;
+
+[Notify]
+public partial class CustomerViewModel : INotifyDataErrorInfo
+{
+    private string _name;
+    private string _email;
+    private readonly CustomerValidator _validator = new();
+    private readonly Dictionary&lt;string, List&lt;string&gt;&gt; _errors = new();
+
+    public bool HasErrors =&gt; _errors.Any();
+    public event EventHandler&lt;DataErrorsChangedEventArgs&gt;? ErrorsChanged;
+
+    // Validate after property changes
+    partial void OnNameChanged() =&gt; ValidateProperty(nameof(Name));
+    partial void OnEmailChanged() =&gt; ValidateProperty(nameof(Email));
+
+    private void ValidateProperty(string propertyName)
+    {
+        var result = _validator.Validate(this);
+        var propertyErrors = result.Errors
+            .Where(e =&gt; e.PropertyName == propertyName)
+            .Select(e =&gt; e.ErrorMessage)
+            .ToList();
+
+        if (propertyErrors.Any())
+            _errors[propertyName] = propertyErrors;
+        else
+            _errors.Remove(propertyName);
+
+        ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(propertyName));
+    }
+
+    public IEnumerable GetErrors(string? propertyName)
+    {
+        return propertyName != null &amp;&amp; _errors.ContainsKey(propertyName)
+            ? _errors[propertyName]
+            : Enumerable.Empty&lt;string&gt;();
+    }
+}
+
+public class CustomerValidator : AbstractValidator&lt;CustomerViewModel&gt;
+{
+    public CustomerValidator()
+    {
+        RuleFor(x =&gt; x.Name).NotEmpty().MaximumLength(100);
+        RuleFor(x =&gt; x.Email).EmailAddress();
+    }
+}
+</code></pre>
+<h4 id="dataannotations">DataAnnotations</h4>
+<pre><code class="lang-csharp">using System.ComponentModel.DataAnnotations;
+using NotifyGen;
+
+[Notify]
+public partial class PersonViewModel : INotifyDataErrorInfo
+{
+    [Required]
+    [MaxLength(100)]
+    private string _name;
+
+    [EmailAddress]
+    private string? _email;
+
+    private readonly Dictionary&lt;string, List&lt;string&gt;&gt; _errors = new();
+
+    public bool HasErrors =&gt; _errors.Any();
+    public event EventHandler&lt;DataErrorsChangedEventArgs&gt;? ErrorsChanged;
+
+    // Validate after each property change
+    partial void OnNameChanged() =&gt; ValidateProperty(nameof(Name), Name);
+    partial void OnEmailChanged() =&gt; ValidateProperty(nameof(Email), Email);
+
+    private void ValidateProperty(string propertyName, object? value)
+    {
+        var results = new List&lt;ValidationResult&gt;();
+        var context = new ValidationContext(this) { MemberName = propertyName };
+
+        Validator.TryValidateProperty(value, context, results);
+
+        if (results.Any())
+            _errors[propertyName] = results.Select(r =&gt; r.ErrorMessage!).ToList();
+        else
+            _errors.Remove(propertyName);
+
+        ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(propertyName));
+    }
+
+    public IEnumerable GetErrors(string? propertyName)
+    {
+        return propertyName != null &amp;&amp; _errors.ContainsKey(propertyName)
+            ? _errors[propertyName]
+            : Enumerable.Empty&lt;string&gt;();
+    }
+}
+</code></pre>
+<p><strong>Note:</strong> NotifyGen focuses on <code>INotifyPropertyChanged</code> generation. For validation errors (<code>INotifyDataErrorInfo</code>), implement that interface manually and trigger validation in partial hooks as shown above.</p>
+<h3 id="inotifypropertychanging-with-implementchanging">INotifyPropertyChanging with <code>ImplementChanging</code></h3>
+<p>For undo/redo scenarios, you may need the <code>PropertyChanging</code> event that fires <em>before</em> the value changes:</p>
+<pre><code class="lang-csharp">[Notify(ImplementChanging = true)]
+public partial class Document
+{
+    private string _content;
+}
+</code></pre>
+<p>This generates:</p>
+<pre><code class="lang-csharp">public partial class Document : INotifyPropertyChanged, INotifyPropertyChanging
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public event PropertyChangingEventHandler? PropertyChanging;
+
+    public string Content
+    {
+        get =&gt; _content;
+        set
+        {
+            if (EqualityComparer&lt;string&gt;.Default.Equals(_content, value)) return;
+            OnPropertyChanging();        // Fires BEFORE change
+            OnContentChanging(_content, value);
+            _content = value;
+            OnPropertyChanged();         // Fires AFTER change
+            OnContentChanged();
+        }
+    }
+
+    protected virtual void OnPropertyChanging([CallerMemberName] string? propertyName = null)
+        =&gt; PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(propertyName));
+}
+</code></pre>
+<p>If your base class already implements <code>INotifyPropertyChanging</code>, NotifyGen detects this and won't duplicate the interface or events.</p>
+<h3 id="command-canexecute-with-notifycanexecutechangedfor">Command CanExecute with <code>[NotifyCanExecuteChangedFor]</code></h3>
+<p>When a property change should refresh a command's <code>CanExecute</code> state, use <code>[NotifyCanExecuteChangedFor]</code>:</p>
+<pre><code class="lang-csharp">[Notify]
+public partial class EditorViewModel
+{
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    [NotifyCanExecuteChangedFor(nameof(UndoCommand))]
+    private string _content;
+
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private bool _isDirty;
+
+    public IRelayCommand SaveCommand { get; }
+    public IRelayCommand UndoCommand { get; }
+}
+</code></pre>
+<p>This generates calls to <code>NotifyCanExecuteChanged()</code> in the setter:</p>
+<pre><code class="lang-csharp">public string Content
+{
+    set
+    {
+        if (EqualityComparer&lt;string&gt;.Default.Equals(_content, value)) return;
+        OnContentChanging(_content, value);
+        _content = value;
+        OnPropertyChanged();
+        SaveCommand?.NotifyCanExecuteChanged();  // Auto-generated
+        UndoCommand?.NotifyCanExecuteChanged();  // Auto-generated
+        OnContentChanged();
+    }
+}
+</code></pre>
+<p>Works with any command type that has a <code>NotifyCanExecuteChanged()</code> method (CommunityToolkit.Mvvm <code>IRelayCommand</code>, Prism <code>DelegateCommand</code>, etc.).</p>
+<h3 id="batch-notification-suppression-with-notifysuppressable">Batch Notification Suppression with <code>[NotifySuppressable]</code></h3>
+<p>For bulk updates where you want to defer <code>PropertyChanged</code> events until all changes complete:</p>
+<pre><code class="lang-csharp">[Notify]
+[NotifySuppressable]
+public partial class Person
+{
+    private string _firstName;
+    private string _lastName;
+    private string _email;
+}
+
+// Usage:
+using (person.SuppressNotifications())
+{
+    person.FirstName = &quot;John&quot;;
+    person.LastName = &quot;Doe&quot;;
+    person.Email = &quot;john@example.com&quot;;
+}  // All three PropertyChanged events fire here
+</code></pre>
+<p>This generates suppression infrastructure:</p>
+<pre><code class="lang-csharp">public partial class Person : INotifyPropertyChanged
+{
+    private int _notificationSuppressionCount;
+    private HashSet&lt;string&gt;? _pendingNotifications;
+
+    public IDisposable SuppressNotifications()
+    {
+        _notificationSuppressionCount++;
+        return new NotificationSuppressor(this);
+    }
+
+    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        if (_notificationSuppressionCount &gt; 0)
+        {
+            _pendingNotifications ??= new HashSet&lt;string&gt;();
+            _pendingNotifications.Add(propertyName!);
+            return;
+        }
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+    // ... ResumeNotifications and NotificationSuppressor class
+}
+</code></pre>
+<p><strong>Features:</strong></p>
+<ul>
+<li>Nested suppression scopes supported (uses reference counting)</li>
+<li>Duplicate property names deduplicated (HashSet)</li>
+<li>Zero allocations when not suppressing</li>
+<li>Designed for the owning UI thread; suppression state is not synchronized</li>
+</ul>
+<h4 id="selective-suppression-with-alwaysnotify">Selective Suppression with <code>AlwaysNotify</code></h4>
+<p>Some properties should always notify immediately, even during suppression (e.g., loading indicators, error flags):</p>
+<pre><code class="lang-csharp">[Notify]
+[NotifySuppressable(AlwaysNotify = new[] { nameof(IsLoading), nameof(HasErrors) })]
+public partial class ViewModel
+{
+    private string _name;
+    private int _age;
+    private bool _isLoading;     // Always fires immediately
+    private bool _hasErrors;     // Always fires immediately
+}
+
+// Usage:
+using (vm.SuppressNotifications())
+{
+    vm.Name = &quot;John&quot;;            // Deferred
+    vm.Age = 30;                 // Deferred
+    vm.IsLoading = true;         // ✓ Fires immediately (AlwaysNotify)
+    vm.HasErrors = false;        // ✓ Fires immediately (AlwaysNotify)
+}  // Name and Age notifications fire here
+</code></pre>
+<p><strong>Use cases:</strong></p>
+<ul>
+<li><strong>Loading indicators</strong> - UI should show spinners immediately, even during bulk updates</li>
+<li><strong>Error flags</strong> - Critical state that must notify immediately</li>
+<li><strong>Validation status</strong> - UX requires immediate feedback</li>
+<li><strong>Progress tracking</strong> - Progress bars should update in real-time</li>
+</ul>
+<p><strong>Implementation:</strong></p>
+<pre><code class="lang-csharp">private static readonly HashSet&lt;string&gt; _neverSuppressedProperties = new()
+{
+    &quot;IsLoading&quot;,
+    &quot;HasErrors&quot;
+};
+
+protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+{
+    // Check if property should never be suppressed
+    if (_notificationSuppressionCount &gt; 0 &amp;&amp; !_neverSuppressedProperties.Contains(propertyName ?? &quot;&quot;))
+    {
+        _pendingNotifications ??= new HashSet&lt;string&gt;();
+        _pendingNotifications.Add(propertyName!);
+        return;
+    }
+    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+}
+</code></pre>
+<p><strong>Performance:</strong> Adds a static <code>HashSet&lt;string&gt;</code> lookup (~O(1)) per <code>OnPropertyChanged</code> call when suppression is active. Negligible cost for typical use cases.</p>
+<h3 id="working-with-existing-inotifypropertychanged">Working with Existing INotifyPropertyChanged</h3>
+<p>If your class already implements <code>INotifyPropertyChanged</code> (e.g., from a base class), NotifyGen detects this and won't generate a duplicate implementation:</p>
+<pre><code class="lang-csharp">public class ViewModelBase : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected virtual void OnPropertyChanged([CallerMemberName] string? name = null)
+        =&gt; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+}
+
+[Notify]
+public partial class MyViewModel : ViewModelBase
+{
+    private string _title;  // Uses base class OnPropertyChanged
+}
+</code></pre>
+<h3 id="nested-notify-classes">Nested <code>[Notify]</code> Classes</h3>
+<p>NotifyGen supports <code>[Notify]</code> classes nested inside classes, structs, interfaces, records, and record structs. Every declaration in the containing chain must be <code>partial</code> so the generator can reopen it:</p>
+<pre><code class="lang-csharp">public partial class Workspace&lt;T&gt;
+    where T : class
+{
+    [Notify]
+    public partial class Editor
+    {
+        private string _title;
+    }
+}
+</code></pre>
+<p>Generic parameters, accessibility, declaration kind, and required modifiers such as <code>unsafe</code> are preserved in generated code, which remains compatible with constrained generic declaration chains. If a containing type is not partial, <code>NOTIFY006</code> identifies that declaration and offers the same <strong>Make type partial</strong> code fix as <code>NOTIFY001</code>. File-local targets and containers are not supported because generated partial declarations are emitted in a separate source file; <code>NOTIFY007</code> reports the unsupported declaration and generation is withheld.</p>
+<h2 id="built-in-analyzers--code-fixes">Built-in Analyzers &amp; Code Fixes</h2>
+<p>NotifyGen includes analyzers that catch mistakes at compile time:</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Severity</th>
+<th>Description</th>
+<th>Auto-Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NOTIFY001</td>
+<td>Error</td>
+<td>Class with <code>[Notify]</code> must be declared <code>partial</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>NOTIFY002</td>
+<td>Warning</td>
+<td>No eligible fields found (need mutable private <code>_underscore</code> fields)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY003</td>
+<td>Warning</td>
+<td><code>[NotifyAlso(&quot;Xyz&quot;)]</code> references property <code>Xyz</code> that doesn't exist</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY004</td>
+<td>Info</td>
+<td>Static or const field cannot generate an instance property</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY005</td>
+<td>Info</td>
+<td>Readonly field cannot generate a property with a setter</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY006</td>
+<td>Error</td>
+<td>A type containing a nested <code>[Notify]</code> class must be <code>partial</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>NOTIFY007</td>
+<td>Error</td>
+<td>A <code>[Notify]</code> target or containing type has file-local accessibility</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY008</td>
+<td>Error</td>
+<td><code>[NotifyAlso]</code> dependencies contain a cycle</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY009</td>
+<td>Error</td>
+<td>Multiple members would generate the same property name</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY010</td>
+<td>Warning</td>
+<td><code>NotifyOnSubPropertyChanged</code> requires a reference child implementing <code>INotifyPropertyChanged</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY011</td>
+<td>Warning</td>
+<td>Target-side <code>NotifyAlso</code> source is not generated by NotifyGen</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY012</td>
+<td>Warning</td>
+<td>Target-side <code>NotifyAlso</code> cannot request child tracking</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY013</td>
+<td>Error</td>
+<td>Existing INPC host has no callable <code>OnPropertyChanged</code> invoker</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY014</td>
+<td>Warning</td>
+<td>Target-side collection tracking is unsupported</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY015</td>
+<td>Warning</td>
+<td>Collection tracking requires a reference source</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY016</td>
+<td>Error</td>
+<td>Requested generated property name is not a valid C# identifier</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY017</td>
+<td>Error</td>
+<td>Existing INPC changing host has no callable <code>OnPropertyChanging</code> invoker</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY018</td>
+<td>Warning</td>
+<td><code>[NotifyComputed]</code> has no recognizable dependencies</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY019</td>
+<td>Warning</td>
+<td><code>[NotifyComputed]</code> is on a generated source member</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY020</td>
+<td>Warning</td>
+<td><code>[NotifyComputed]</code> is not a get-only instance property</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY021</td>
+<td>Warning</td>
+<td><code>[NotifyComputed]</code> getter is outside the allow-list</td>
+<td>—</td>
+</tr>
+<tr>
+<td>NOTIFY022</td>
+<td>Warning</td>
+<td><code>[Notify]</code> type still has CommunityToolkit <code>[ObservableProperty]</code> / <code>[NotifyPropertyChangedFor]</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>NOTIFY023</td>
+<td>Hidden</td>
+<td>CommunityToolkit property attributes without <code>[Notify]</code></td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<p><strong>NOTIFY001 and NOTIFY006 have a code fix</strong> — click the lightbulb (or press <code>Ctrl+.</code> / <code>Cmd+.</code>) and select &quot;Make type partial&quot; to add the required modifier. <strong>NOTIFY002</strong> prefixes private instance fields with <code>_</code>. <strong>NOTIFY003</strong> replaces a nearby unknown <code>[NotifyAlso]</code> name.</p>
+<h2 id="performance">Performance</h2>
+<p>NotifyGen is built for large codebases:</p>
+<ul>
+<li><strong>Incremental generation</strong> - Only regenerates code for classes that actually changed</li>
+<li><strong>No runtime overhead</strong> - All code is generated at compile time</li>
+<li><strong>Efficient equality checks</strong> - Uses <code>EqualityComparer&lt;T&gt;.Default</code> for optimal performance</li>
+<li><strong>Lean generated setters</strong> - No reflection, LINQ, closures, or avoidable boxing</li>
+</ul>
+<p>The generator uses Roslyn's incremental compilation pipeline with proper <code>IEquatable&lt;T&gt;</code> implementations on all data structures, so your IDE stays responsive even with hundreds of <code>[Notify]</code> classes.</p>
+<h3 id="benchmark-results">Benchmark Results</h3>
+<p>Comparison against popular INPC libraries on .NET 9.0 (Apple M4):</p>
+<h4 id="property-setters-string">Property Setters (String)</h4>
+<table>
+<thead>
+<tr>
+<th>Library</th>
+<th style="text-align: right;">Mean</th>
+<th style="text-align: right;">Ratio</th>
+<th style="text-align: right;">Allocated</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>NotifyGen</strong></td>
+<td style="text-align: right;"><strong>17.57 ns</strong></td>
+<td style="text-align: right;"><strong>1.00</strong></td>
+<td style="text-align: right;">48 B</td>
+</tr>
+<tr>
+<td>CommunityToolkit.Mvvm</td>
+<td style="text-align: right;">18.47 ns</td>
+<td style="text-align: right;">1.05</td>
+<td style="text-align: right;">48 B</td>
+</tr>
+<tr>
+<td>Fody PropertyChanged</td>
+<td style="text-align: right;">18.50 ns</td>
+<td style="text-align: right;">1.05</td>
+<td style="text-align: right;">48 B</td>
+</tr>
+<tr>
+<td>Prism</td>
+<td style="text-align: right;">26.28 ns</td>
+<td style="text-align: right;">1.50</td>
+<td style="text-align: right;">72 B</td>
+</tr>
+</tbody>
+</table>
+<h4 id="property-setters-int">Property Setters (Int)</h4>
+<table>
+<thead>
+<tr>
+<th>Library</th>
+<th style="text-align: right;">Mean</th>
+<th style="text-align: right;">Ratio</th>
+<th style="text-align: right;">Allocated</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fody PropertyChanged</td>
+<td style="text-align: right;">0.46 ns</td>
+<td style="text-align: right;">0.92</td>
+<td style="text-align: right;">-</td>
+</tr>
+<tr>
+<td><strong>NotifyGen</strong></td>
+<td style="text-align: right;"><strong>0.50 ns</strong></td>
+<td style="text-align: right;"><strong>1.00</strong></td>
+<td style="text-align: right;">-</td>
+</tr>
+<tr>
+<td>CommunityToolkit.Mvvm</td>
+<td style="text-align: right;">0.91 ns</td>
+<td style="text-align: right;">1.81</td>
+<td style="text-align: right;">-</td>
+</tr>
+<tr>
+<td>Prism</td>
+<td style="text-align: right;">5.01 ns</td>
+<td style="text-align: right;">9.99</td>
+<td style="text-align: right;">24 B</td>
+</tr>
+</tbody>
+</table>
+<h4 id="equality-guards-same-value---no-event">Equality Guards (Same Value - No Event)</h4>
+<table>
+<thead>
+<tr>
+<th>Library</th>
+<th style="text-align: right;">Mean</th>
+<th style="text-align: right;">Ratio</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fody PropertyChanged</td>
+<td style="text-align: right;">0.48 ns</td>
+<td style="text-align: right;">0.93</td>
+</tr>
+<tr>
+<td>Prism</td>
+<td style="text-align: right;">0.50 ns</td>
+<td style="text-align: right;">0.97</td>
+</tr>
+<tr>
+<td><strong>NotifyGen</strong></td>
+<td style="text-align: right;"><strong>0.52 ns</strong></td>
+<td style="text-align: right;"><strong>1.00</strong></td>
+</tr>
+<tr>
+<td>CommunityToolkit.Mvvm</td>
+<td style="text-align: right;">0.52 ns</td>
+<td style="text-align: right;">1.01</td>
+</tr>
+</tbody>
+</table>
+<p>NotifyGen is the <strong>fastest for string property setters</strong> and competitive across all benchmarks. Primitive types (int, bool, double, etc.) use direct <code>==</code> comparison for optimal performance.</p>
+<p>Run benchmarks yourself:</p>
+<pre><code class="lang-bash">dotnet run -c Release --project benchmarks/NotifyGen.Benchmarks -- --filter *CompetitorBenchmarks*
+</code></pre>
+<h2 id="how-it-compares">How It Compares</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>NotifyGen</th>
+<th>Fody.PropertyChanged</th>
+<th>CommunityToolkit.Mvvm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Approach</td>
+<td>Source Generator</td>
+<td>IL Weaving</td>
+<td>Source Generator</td>
+</tr>
+<tr>
+<td>Runtime dependency</td>
+<td>None</td>
+<td>None</td>
+<td>Runtime library required</td>
+</tr>
+<tr>
+<td>Debugging</td>
+<td>Full—step through generated code</td>
+<td>Limited—IL is modified</td>
+<td>Full—step through generated code</td>
+</tr>
+<tr>
+<td>Build impact</td>
+<td>Runs during compile</td>
+<td>Post-build step</td>
+<td>Runs during compile</td>
+</tr>
+<tr>
+<td>Equality checks</td>
+<td>Always built-in</td>
+<td>Configurable</td>
+<td>Opt-in with attribute</td>
+</tr>
+<tr>
+<td>Partial properties</td>
+<td>✅ C# 14/preview</td>
+<td>❌ Weaves existing properties</td>
+<td>✅ C# 14/preview</td>
+</tr>
+<tr>
+<td>Property metadata forwarding</td>
+<td>✅ Property-targetable field attributes</td>
+<td>✅ Existing property metadata</td>
+<td>✅ Property/accessor metadata</td>
+</tr>
+<tr>
+<td>Child property notifications</td>
+<td>✅ Opt-in BCL subscription</td>
+<td>✅ Weaving support varies</td>
+<td>Runtime/reactive APIs</td>
+</tr>
+<tr>
+<td>Existing INPC host reuse</td>
+<td>✅ Accessible invoker, no duplicate event</td>
+<td>✅ Weaves existing types</td>
+<td>Base contract/runtime APIs</td>
+</tr>
+<tr>
+<td>Collection membership notifications</td>
+<td>✅ Opt-in BCL subscription</td>
+<td>✅ Weaving support varies</td>
+<td>Runtime/reactive APIs</td>
+</tr>
+<tr>
+<td>Partial hooks</td>
+<td><code>OnXxxChanging</code> + <code>OnXxxChanged</code></td>
+<td>Intercept methods</td>
+<td><code>OnXxxChanging</code> only</td>
+</tr>
+<tr>
+<td>INotifyPropertyChanging</td>
+<td>✅ <code>ImplementChanging = true</code></td>
+<td>✅ Built-in</td>
+<td>✅ Separate attribute</td>
+</tr>
+<tr>
+<td>Command CanExecute refresh</td>
+<td>✅ <code>[NotifyCanExecuteChangedFor]</code></td>
+<td>❌ Manual</td>
+<td>✅ <code>[NotifyCanExecuteChangedFor]</code></td>
+</tr>
+<tr>
+<td>Batch notification suppression</td>
+<td>✅ <code>[NotifySuppressable]</code></td>
+<td>❌ Not available</td>
+<td>❌ Not available</td>
+</tr>
+<tr>
+<td>Learning curve</td>
+<td>One attribute</td>
+<td>Multiple attributes + config</td>
+<td>Multiple attributes</td>
+</tr>
+<tr>
+<td><strong>Performance</strong></td>
+<td><strong>Fastest</strong></td>
+<td>Fast</td>
+<td>Good</td>
+</tr>
+</tbody>
+</table>
+<p><strong>When to use NotifyGen:</strong> You want to eliminate INPC boilerplate with minimal setup. One attribute, done.</p>
+<p><strong>When to use CommunityToolkit.Mvvm:</strong> You need a full MVVM framework with commands, messaging, dependency injection, and more.</p>
+<p><strong>When to use Fody:</strong> You have an existing codebase using Fody, or you need IL-level modifications for other reasons.</p>
+<h2 id="requirements">Requirements</h2>
+<ul>
+<li><strong>.NET Standard 2.0+</strong> — Compatible with:
+<ul>
+<li>.NET Framework 4.6.1+</li>
+<li>.NET Core 3.1+</li>
+<li>.NET 5, 6, 7, 8, 9, 10</li>
+<li>Mono, Xamarin, Unity (2021.2+)</li>
+</ul>
+</li>
+<li><strong>C# 9.0+</strong> — Required for source generator support</li>
+<li><strong>C# 14/preview</strong> — Required only for partial-property mode; field mode works with C# 9+</li>
+</ul>
+<h2 id="quick-reference">Quick Reference</h2>
+<pre><code class="lang-csharp">[Notify]                              // Enable generation for this class
+[Notify(ImplementChanging = true)]    // Also implement INotifyPropertyChanging
+[NotifySuppressable]                  // Enable batch notification suppression
+public partial class MyViewModel      // Must be partial
+{
+    private string _name;             // → public string Name { get; set; }
+
+    [NotifyIgnore]
+    private int _internal;            // No property generated
+
+    [NotifyAlso(&quot;FullName&quot;)]
+    private string _firstName;        // Also raises PropertyChanged for FullName
+
+    [NotifyName(&quot;IsActive&quot;)]
+    private bool _active;             // → public bool IsActive { get; set; }
+
+    [NotifySetter(AccessLevel.Private)]
+    private int _id;                  // → public int Id { get; private set; }
+
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private bool _canSave;            // Calls SaveCommand.NotifyCanExecuteChanged()
+
+    public IRelayCommand SaveCommand { get; }
+
+    // Optional hooks - implement only what you need
+    partial void OnNameChanging(string oldValue, string newValue);
+    partial void OnNameChanged();
+}
+
+// Batch updates (when [NotifySuppressable] is applied):
+using (viewModel.SuppressNotifications())
+{
+    viewModel.Name = &quot;New Name&quot;;
+    viewModel.IsActive = true;
+}  // PropertyChanged fires for both here
+</code></pre>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<p><strong>Properties not generating?</strong></p>
+<ol>
+<li>Add <code>partial</code> to your class declaration</li>
+<li>Make sure fields are <code>private</code> (not <code>public</code>, <code>protected</code>, or <code>internal</code>)</li>
+<li>Fields must start with underscore: <code>_name</code>, not <code>name</code> or <code>m_name</code></li>
+<li>Rebuild the solution (Ctrl+Shift+B)</li>
+</ol>
+<p><strong>IntelliSense not showing generated properties?</strong></p>
+<ul>
+<li>Restart Visual Studio/Rider</li>
+<li>Check Dependencies → Analyzers → NotifyGen in Solution Explorer</li>
+<li>Ensure the project builds successfully</li>
+</ul>
+<p><strong>NOTIFY001: Class must be partial?</strong></p>
+<pre><code class="lang-csharp">// Wrong
+[Notify]
+public class MyClass { }
+
+// Right
+[Notify]
+public partial class MyClass { }
+</code></pre>
+<p><strong>NOTIFY002: No eligible fields?</strong></p>
+<p>The diagnostic reports that the class has no eligible fields:</p>
+<pre><code>NOTIFY002: Class 'MyClass' is marked with [Notify] but has no private fields with underscore prefix (e.g., '_fieldName'). No properties will be generated.
+</code></pre>
+<p>Common fixes:</p>
+<pre><code class="lang-csharp">// Wrong - no underscore prefix
+private string name;           // Fix: private string _name;
+
+// Wrong - readonly field
+private readonly string _logger;   // Fix: Remove readonly or add [NotifyIgnore]
+
+// Wrong - static field
+private static string _shared;     // Fix: Remove static (static fields can't notify)
+
+// Right - eligible fields
+private string _name;
+private int _age;
+private bool? _isActive;
+</code></pre>
+<p><strong>NOTIFY004/NOTIFY005: Static or readonly fields?</strong></p>
+<p>These are informational diagnostics. If you see them:</p>
+<ul>
+<li>Remove <code>static</code>, <code>const</code>, or <code>readonly</code> modifier if you want property generation</li>
+<li>Add <code>[NotifyIgnore]</code> to suppress the warning if the field should not generate a property</li>
+</ul>
+<p><strong>NOTIFY006: Containing type is not partial?</strong></p>
+<p>Every class, struct, interface, record, or record struct around a nested <code>[Notify]</code> class must be <code>partial</code>:</p>
+<pre><code class="lang-csharp">// Wrong
+public class Workspace
+{
+    [Notify]
+    public partial class Editor { private string _title; }
+}
+
+// Right
+public partial class Workspace
+{
+    [Notify]
+    public partial class Editor { private string _title; }
+}
+</code></pre>
+<p>Use the <strong>Make type partial</strong> code fix on each reported containing declaration.</p>
+<p><strong>NOTIFY007: File-local type is not supported?</strong></p>
+<p>C# restricts a <code>file</code> type to its declaring source file. NotifyGen emits partial declarations into a generated file, so neither a <code>[Notify]</code> class nor any of its containing types can use file-local accessibility:</p>
+<pre><code class="lang-csharp">// Wrong - generated source cannot reopen FileOnlyViewModel
+[Notify]
+file partial class FileOnlyViewModel
+{
+    private string _name;
+}
+
+// Right
+[Notify]
+internal partial class ViewModel
+{
+    private string _name;
+}
+</code></pre>
+<p>Replace <code>file</code> with an appropriate non-file accessibility modifier to enable generation.</p>
+<p><strong>How to debug generated code?</strong></p>
+<ol>
+<li>Build the project successfully</li>
+<li>In Solution Explorer: Expand <strong>Dependencies → Analyzers → NotifyGen → NotifyGen.Generator → NotifyGenerator</strong></li>
+<li>You'll see <code>YourClass.g.cs</code> files - this is the generated code</li>
+<li>Open them to see exactly what was generated</li>
+<li>Set breakpoints in generated code during debugging</li>
+</ol>
+<p><strong>Custom property names for migrations?</strong></p>
+<p><code>[NotifyName]</code> changes the generated property name, but the field must still follow the private underscore convention:</p>
+<pre><code class="lang-csharp">[NotifyName(&quot;Name&quot;)]
+private string _legacyName;  // Generates Name
+
+[NotifyName(&quot;CustomerID&quot;)]
+private int _legacyCustomerId;  // Generates CustomerID
+</code></pre>
+<p>Use this when the public property name must preserve an existing API. <code>[NotifyName]</code> does not make <code>m_name</code>, <code>mName</code>, or other ineligible field shapes eligible.</p>
+<h2 id="samples">Samples</h2>
+<p>The repository includes sample projects to help you get started:</p>
+<h3 id="console-sample-cross-platform">Console Sample (Cross-Platform)</h3>
+<p>A simple console app demonstrating NotifyGen's core property-generation features without UI framework dependencies:</p>
+<pre><code class="lang-bash">dotnet run --project samples/NotifyGen.ConsoleSample
+</code></pre>
+<p>This sample shows:</p>
+<ul>
+<li>Basic property generation</li>
+<li><code>[NotifyAlso]</code> for dependent properties</li>
+<li><code>[NotifyName]</code> for custom property names</li>
+<li><code>[NotifySetter]</code> for access control</li>
+<li><code>[NotifyIgnore]</code> for excluded fields</li>
+<li>Partial hooks for validation and side effects</li>
+<li>Equality guards preventing duplicate events</li>
+</ul>
+<h3 id="wpf-sample-windows">WPF Sample (Windows)</h3>
+<p>A WPF application demonstrating data binding with generated properties:</p>
+<pre><code class="lang-bash">dotnet run --project samples/NotifyGen.WpfSample
+</code></pre>
+<h2 id="benchmarks">Benchmarks</h2>
+<p><a href="https://github.com/georgepwall1991/NotifyGen/blob/master/benchmarks/NotifyGen.Benchmarks/README.md">Performance benchmarks</a> compare generated setters with equivalent hand-written notification code:</p>
+<pre><code class="lang-bash"># Run all benchmarks
+dotnet run -c Release --project benchmarks/NotifyGen.Benchmarks
+
+# Run competitor comparison
+dotnet run -c Release --project benchmarks/NotifyGen.Benchmarks -- --filter *CompetitorBenchmarks*
+
+# Run setter performance (NotifyGen vs hand-written)
+dotnet run -c Release --project benchmarks/NotifyGen.Benchmarks -- --filter *SetterBenchmarks*
+</code></pre>
+<p>Benchmarks include:</p>
+<ul>
+<li><strong>Competitor comparison</strong> — NotifyGen vs CommunityToolkit.Mvvm, Prism, and Fody PropertyChanged</li>
+<li><strong>Setter performance</strong> — Generated setters vs hand-written (should be identical)</li>
+<li><strong>Generator performance</strong> — Compilation time for 1, 10, and 100 classes</li>
+<li><strong>Incremental rebuild</strong> — Time to rebuild when only one class changes</li>
+</ul>
+<p>Multi-framework support: Benchmarks target .NET 8.0, 9.0, and 10.0.</p>
+<h2 id="contributing">Contributing</h2>
+<p>Found a bug? Have a feature request? <a href="https://github.com/georgepwall1991/NotifyGen/issues">Open an issue</a>.</p>
+<p>Want to contribute code? PRs are welcome. Please include tests for new functionality.</p>
+<h2 id="license">License</h2>
+<p>MIT License — use it in personal projects, commercial projects, wherever. See <a href="https://github.com/georgepwall1991/NotifyGen/blob/master/LICENSE">LICENSE</a> for details.</p>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/georgepwall1991/NotifyGen/blob/master/docs/site/features.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          NotifyGen — zero-runtime INPC source generator
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

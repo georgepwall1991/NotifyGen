@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Migrate from CommunityToolkit.Mvvm [ObservableProperty] | NotifyGen </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Migrate from CommunityToolkit.Mvvm [ObservableProperty] | NotifyGen ">
+      
+      
+      <link rel="icon" href="favicon.ico">
+      <link rel="stylesheet" href="public/docfx.min.css">
+      <link rel="stylesheet" href="public/main.css">
+      <meta name="docfx:navrel" content="toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/georgepwall1991/NotifyGen/blob/master/docs/site/migrate.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="index.html">
+            <img id="logo" class="svg" src="assets/icon.png" alt="NotifyGen">
+            NotifyGen
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="migrate-from-communitytoolkitmvvm-observableproperty">Migrate from CommunityToolkit.Mvvm <code>[ObservableProperty]</code></h1>
+
+<p>NotifyGen is a <strong>narrow INPC source generator</strong>. Keep CommunityToolkit.Mvvm for <code>RelayCommand</code>, messengers, and DI helpers — use NotifyGen for properties.</p>
+<h2 id="migration-checklist">Migration checklist</h2>
+<ol>
+<li><strong>Keep CT packages</strong> — do not remove <code>CommunityToolkit.Mvvm</code> if you use commands, messengers, or DI helpers.</li>
+<li><strong>Add NotifyGen</strong> — <code>dotnet add package NotifyGen</code>.</li>
+<li><strong>Pick one ViewModel</strong> — migrate a single type first (not the whole solution).</li>
+<li><strong>Lightbulb / Fix All</strong> — <strong>NOTIFY023</strong> (no <code>[Notify]</code> yet) or <strong>NOTIFY022</strong> (already <code>[Notify]</code>) converts the type. Do not delete <code>[ObservableProperty]</code> by hand.</li>
+<li><strong>What the fixer does</strong> — adds <code>[Notify]</code> + <code>partial</code>, replaces <code>[ObservableProperty]</code> with <code>[NotifyProperty]</code> (opt-in), maps <code>[NotifyPropertyChangedFor]</code> to <code>[NotifyComputed]</code> on get-only dependents, leaves <code>RelayCommand</code> alone.</li>
+<li><strong>Unmarked <code>_fields</code> stay private</strong> — <code>_logger</code>, <code>_disposed</code>, and other underscore fields without <code>[NotifyProperty]</code> are not published.</li>
+<li><strong>Map leftover dependents by hand only if needed</strong> — <code>[NotifyComputed]</code> on the derived property, or <code>[NotifyAlso]</code> on a source.</li>
+<li><strong>Map commands</strong> — keep <code>[NotifyCanExecuteChangedFor]</code> pointing at CT <code>IRelayCommand</code> properties.</li>
+<li><strong>Base class</strong> — <code>ObservableObject</code> is optional. Prefer your own INPC host; NotifyGen reuses accessible <code>OnPropertyChanged</code>.</li>
+<li><strong>Leave out of scope on CT</strong> — messenger recipients, validation/INDEI, navigation.</li>
+<li><strong>Verify</strong> — build, bind once in UI, then migrate the next ViewModel.</li>
+</ol>
+<p>Paste-friendly status for Discussions / Stack Overflow:</p>
+<pre><code class="lang-text">Migrating VM: ________
+Kept on CT: RelayCommand / Messenger / other: ________
+Blocked on: ________
+</code></pre>
+<h2 id="attribute-map">Attribute map</h2>
+<table>
+<thead>
+<tr>
+<th>CommunityToolkit</th>
+<th>NotifyGen</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[ObservableProperty]</code> on a field</td>
+<td><code>[Notify]</code> on the class + <code>[NotifyProperty]</code> on the field (opt-in; unmarked <code>_logger</code> stays private)</td>
+</tr>
+<tr>
+<td>C# partial properties with CT</td>
+<td>C# 14 incomplete partial properties under <code>[Notify]</code></td>
+</tr>
+<tr>
+<td><code>[NotifyPropertyChangedFor(nameof(X))]</code></td>
+<td><code>[NotifyComputed]</code> on <code>X</code>, or <code>[NotifyAlso(nameof(X))]</code> on each source</td>
+</tr>
+<tr>
+<td>Proposed <code>[ComputedProperty]</code> (CT #1175)</td>
+<td><code>[NotifyComputed]</code> / <code>[NotifyComputed(nameof(...))]</code></td>
+</tr>
+<tr>
+<td>Target-side depends-on (CT PR style)</td>
+<td><code>[NotifyAlso(nameof(Source), NotifyFrom = true)]</code> on the dependent</td>
+</tr>
+<tr>
+<td>Child object refresh</td>
+<td><code>[NotifyAlso(nameof(X), NotifyOnSubPropertyChanged = true)]</code></td>
+</tr>
+<tr>
+<td>Collection membership refresh</td>
+<td><code>[NotifyAlso(nameof(X), NotifyOnCollectionChanged = true)]</code></td>
+</tr>
+<tr>
+<td><code>[NotifyCanExecuteChangedFor]</code></td>
+<td>Same name — works with CT <code>IRelayCommand</code></td>
+</tr>
+<tr>
+<td><code>[NotifyPropertyChangedRecipients]</code> / messenger</td>
+<td>Out of scope — keep CT</td>
+</tr>
+<tr>
+<td>Validation / INDEI generation</td>
+<td>Out of scope — forward DataAnnotations; validate yourself</td>
+</tr>
+<tr>
+<td>Base <code>ObservableObject</code></td>
+<td>Optional. Prefer your own INPC host; NotifyGen reuses accessible <code>OnPropertyChanged</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="before--after">Before / after</h2>
+<pre><code class="lang-csharp">// CommunityToolkit
+public partial class Person : ObservableObject
+{
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FullName))]
+    private string _firstName;
+}
+
+// NotifyGen (or accept the NOTIFY023 code-fix)
+[Notify]
+public partial class Person
+{
+    [NotifyProperty]
+    [NotifyAlso(nameof(FullName))]
+    private string _firstName;
+
+    private readonly ILogger _logger; // stays private
+}
+</code></pre>
+<h3 id="commands-hybrid--paste-this">Commands (hybrid — paste this)</h3>
+<pre><code class="lang-csharp">// Before: CT owns properties + commands
+public partial class EditorViewModel : ObservableObject
+{
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private string _title;
+
+    [RelayCommand(CanExecute = nameof(CanSave))]
+    private void Save() { }
+
+    private bool CanSave() =&gt; !string.IsNullOrWhiteSpace(Title);
+}
+
+// After: NotifyGen owns properties; CT owns RelayCommand
+[Notify]
+public partial class EditorViewModel
+{
+    [NotifyAlso(nameof(CanSave))]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private string _title = &quot;&quot;;
+
+    public bool CanSave =&gt; !string.IsNullOrWhiteSpace(Title);
+
+    public IRelayCommand SaveCommand { get; }
+
+    public EditorViewModel()
+    {
+        SaveCommand = new RelayCommand(Save, () =&gt; CanSave);
+    }
+
+    private void Save() { }
+}
+</code></pre>
+<h2 id="host--base-class-migration">Host / base-class migration</h2>
+<p>If a base type already owns <code>INotifyPropertyChanged</code> and an accessible <code>OnPropertyChanged(string?)</code> or <code>OnPropertyChanged(PropertyChangedEventArgs)</code>:</p>
+<pre><code class="lang-csharp">public abstract class ViewModelBase : INotifyPropertyChanged { /* event + OnPropertyChanged */ }
+
+[Notify]
+public partial class EditorViewModel : ViewModelBase
+{
+    private string _title;
+}
+</code></pre>
+<p>NotifyGen reuses the host invoker and does not emit a second event. Incompatible hosts report <strong>NOTIFY013</strong> / <strong>NOTIFY017</strong>.</p>
+<h2 id="metadata">Metadata</h2>
+<ul>
+<li>Untargeted attributes valid on properties forward automatically (Cycle 2).</li>
+<li>Explicit <code>[property:]</code> / <code>[get:]</code> / <code>[set:]</code> on fields forward onto the generated property/accessors (Cycle 5 / 2.0). CS0657/CS0658 are suppressed for <code>[Notify]</code> fields.</li>
+</ul>
+<h2 id="commands">Commands</h2>
+<pre><code class="lang-csharp">[Notify]
+public partial class EditorViewModel
+{
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private string _title;
+
+    public IRelayCommand SaveCommand { get; } // CommunityToolkit.Mvvm
+}
+</code></pre>
+<p>See the Avalonia UI hybrid sample: <a href="https://github.com/georgepwall1991/NotifyGen/tree/master/samples/NotifyGen.HybridSample"><code>samples/NotifyGen.HybridSample</code></a>.</p>
+<h2 id="what-notifygen-will-not-become">What NotifyGen will not become</h2>
+<p>Messenger, DI, navigation, collection item bubbling, or a validation runtime. Those stay with CT or your app code.</p>
+<h2 id="discussion-prompts">Discussion prompts</h2>
+<ul>
+<li><strong>I migrated X</strong> — Show and tell template</li>
+<li><strong>Hybrid setup help</strong> — Migration template</li>
+<li><strong>Why not a full MVVM toolkit?</strong> — Q&amp;A template</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/georgepwall1991/NotifyGen/blob/master/docs/site/migrate.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          NotifyGen — zero-runtime INPC source generator
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
