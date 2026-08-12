@@ -12,7 +12,7 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>NotifyGen</PackageId>
-    <Version>2.1.0</Version>
+    <Version>2.2.0</Version>
     <Authors>George Wall</Authors>
     <Title>NotifyGen - INotifyPropertyChanged Source Generator</Title>
     <Description>Compile-time INotifyPropertyChanged source generator for .NET. One [Notify] attribute generates equality-guarded properties with no runtime package and no required ObservableObject base class — use it beside CommunityToolkit.Mvvm commands.
@@ -30,7 +30,8 @@ Features:
 • [NotifyCanExecuteChangedFor] for automatic command refresh
 • [NotifySuppressable] for batch notification suppression
 • Nested [Notify] class support with generic declaration preservation
-• Analyzer diagnostics and code fixes for invalid partial declarations, underscore field names, and unknown NotifyAlso names
+• [NotifyProperty] opt-in so CommunityToolkit ViewModels can migrate one member at a time
+• Analyzer diagnostics and code fixes for CommunityToolkit [ObservableProperty] conversion, invalid partial declarations, underscore field names, and unknown NotifyAlso names
 • Works with WPF, MAUI, Blazor, Avalonia, Uno Platform, WinUI, and Xamarin
 • AOT compatible and trimming safe</Description>
     <PackageTags>INotifyPropertyChanged;INPC;SourceGenerator;Roslyn;roslyn-analyzer;analyzers;MVVM;WPF;MAUI;Avalonia;WinUI;Blazor;Uno;PropertyChanged;DataBinding;ViewModel</PackageTags>
@@ -40,7 +41,11 @@ Features:
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>v2.1.0:
+    <PackageReleaseNotes>v2.2.0:
+• [NotifyProperty] and CommunityToolkit [ObservableProperty] switch a [Notify] type to opt-in generation so unmarked underscore fields stay private
+• NOTIFY022 / NOTIFY023 convert CommunityToolkit property attributes with Fix All
+
+v2.1.0:
 • [NotifyComputed] wires derived properties from the getter or an explicit DependsOn list
 • NOTIFY018 / NOTIFY019 / NOTIFY021 for empty, generated-member, and unsupported computed getters
 

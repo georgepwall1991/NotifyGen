@@ -25,7 +25,11 @@ namespace NotifyGen;
 /// }
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Field, Inherited = false, AllowMultiple = true)]
+[AttributeUsage(
+    AttributeTargets.Field | AttributeTargets.Property,
+    Inherited = false,
+    AllowMultiple = true
+)]
 public sealed class NotifyCanExecuteChangedForAttribute : Attribute
 {
     /// <summary>

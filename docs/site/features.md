@@ -345,6 +345,14 @@ public partial class ViewModel
 
 Use `[NotifyIgnore]` on fields you want to exclude from generation (e.g., services, readonly state).
 
+### Opt-in members with `[NotifyProperty]`
+
+Greenfield `[Notify]` types still generate every eligible underscore field. If any
+member is marked `[NotifyProperty]` — or CommunityToolkit `[ObservableProperty]` —
+NotifyGen switches that type to **opt-in**: only marked fields and incomplete
+partials become properties. Unmarked `_logger` / `_disposed` stay private. The
+**NOTIFY022** / **NOTIFY023** code-fix performs this conversion.
+
 ### Equality Guards
 
 Every generated setter checks if the value actually changed before doing anything:
@@ -975,6 +983,12 @@ NotifyGen includes analyzers that catch mistakes at compile time:
 | NOTIFY015 | Warning | Collection tracking requires a reference source | — |
 | NOTIFY016 | Error | Requested generated property name is not a valid C# identifier | — |
 | NOTIFY017 | Error | Existing INPC changing host has no callable `OnPropertyChanging` invoker | — |
+| NOTIFY018 | Warning | `[NotifyComputed]` has no recognizable dependencies | — |
+| NOTIFY019 | Warning | `[NotifyComputed]` is on a generated source member | — |
+| NOTIFY020 | Warning | `[NotifyComputed]` is not a get-only instance property | — |
+| NOTIFY021 | Warning | `[NotifyComputed]` getter is outside the allow-list | — |
+| NOTIFY022 | Warning | `[Notify]` type still has CommunityToolkit `[ObservableProperty]` / `[NotifyPropertyChangedFor]` | Yes |
+| NOTIFY023 | Warning | CommunityToolkit property attributes without `[Notify]` | Yes |
 
 **NOTIFY001 and NOTIFY006 have a code fix** — click the lightbulb (or press `Ctrl+.` / `Cmd+.`) and select "Make type partial" to add the required modifier. **NOTIFY002** prefixes private instance fields with `_`. **NOTIFY003** replaces a nearby unknown `[NotifyAlso]` name.
 

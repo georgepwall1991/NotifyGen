@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-08-12
+
+### Added
+
+- `[NotifyProperty]` (and CommunityToolkit `[ObservableProperty]`) switches a `[Notify]` type to opt-in generation so unmarked underscore fields stay private
+- **NOTIFY022** / **NOTIFY023** convert CommunityToolkit `[ObservableProperty]` / `[NotifyPropertyChangedFor]` to `[NotifyProperty]` / `[NotifyComputed]` with Fix All
+
+### Changed
+
+- Migration guide and hybrid sample show the lightbulb path instead of “delete `[ObservableProperty]` and generate every `_field`”
+
 ## [2.1.0] - 2026-08-12
 
 ### Added

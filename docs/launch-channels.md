@@ -10,6 +10,10 @@ NotifyGen is a narrow Roslyn source generator for `INotifyPropertyChanged`. One 
 
 **Recommended stack:** NotifyGen for properties, CommunityToolkit.Mvvm for `RelayCommand` / messaging.
 
+What's new in 2.2:
+- One-click CommunityToolkit conversion (**NOTIFY023**): `[NotifyProperty]` opt-in so `_logger` stays private
+- `[NotifyComputed]` for derived properties (CommunityToolkit discussion #1175 still open)
+
 What's new in 2.0:
 - `[property:]` / `[get:]` / `[set:]` metadata forwarding + CS0657/CS0658 suppressions
 - WPF, Avalonia, MAUI, and hybrid samples

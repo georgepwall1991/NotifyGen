@@ -23,6 +23,8 @@
 | **NOTIFY019** | Warning | `[NotifyComputed]` is on a generated source member | Use it on a read-only computed property |
 | **NOTIFY020** | Warning | `[NotifyComputed]` is not a get-only instance property | Use a non-static, non-indexer, get-only computed property |
 | **NOTIFY021** | Warning | `[NotifyComputed]` getter is outside the allow-list | Pass explicit `DependsOn` names (LINQ / helpers) |
+| **NOTIFY022** | Warning | `[Notify]` type still has CommunityToolkit `[ObservableProperty]` / `[NotifyPropertyChangedFor]` | Code-fix converts to `[NotifyProperty]` / `[NotifyComputed]` |
+| **NOTIFY023** | Warning | Type has CommunityToolkit property attributes and no `[Notify]` | Code-fix adds `[Notify]` + opt-in `[NotifyProperty]` and leaves unmarked `_fields` private |
 
 ## Suppressions
 
@@ -31,4 +33,4 @@
 | **NOTIFYSPR0001** | CS0657 | `[property: …]` on a field inside a `[Notify]` type |
 | **NOTIFYSPR0002** | CS0658 | `[get: …]` / `[set: …]` on a field inside a `[Notify]` type |
 
-Code fixes: **NOTIFY001** / **NOTIFY006** offer **Make type partial**. **NOTIFY002** prefixes private instance fields with `_`. **NOTIFY003** replaces a nearby unknown `[NotifyAlso]` name.
+Code fixes: **NOTIFY001** / **NOTIFY006** offer **Make type partial**. **NOTIFY002** prefixes private instance fields with `_`. **NOTIFY003** replaces a nearby unknown `[NotifyAlso]` name. **NOTIFY022** / **NOTIFY023** convert CommunityToolkit property attributes to NotifyGen opt-in members.
